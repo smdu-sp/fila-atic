@@ -1,38 +1,38 @@
-"use client"
+"use client";
 
-import { useState, useTransition } from "react"
-import { useForm } from "react-hook-form"
-import { signIn } from "next-auth/react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useState, useTransition } from "react";
+import { useForm } from "react-hook-form";
+import { signIn } from "next-auth/react";
+import { useRouter, useSearchParams } from "next/navigation";
 
-import { Button } from "@/components/ui/button"
-import { Form } from "@/components/ui/form"
-import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button";
+import { Form } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 import {
   Field,
   FieldContent,
   FieldError,
   FieldLabel,
-} from "@/components/ui/field"
+} from "@/components/ui/field";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
+} from "@/components/ui/card";
 
 type LoginFormValues = {
-  login: string
-  password: string
-}
+  login: string;
+  password: string;
+};
 
 export default function LoginPage() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const callbackUrl = searchParams.get("callbackUrl") ?? "/"
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [isPending, startTransition] = useTransition()
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl") ?? "/";
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
 
   const {
     register,
@@ -43,26 +43,26 @@ export default function LoginPage() {
       login: "",
       password: "",
     },
-  })
+  });
 
   const onSubmit = handleSubmit((values) => {
-    setErrorMessage(null)
+    setErrorMessage(null);
 
     startTransition(async () => {
       const result = await signIn("credentials", {
         login: values.login,
         password: values.password,
         redirect: false,
-      })
+      });
 
       if (result?.error) {
-        setErrorMessage(result.error)
-        return
+        setErrorMessage(result.error);
+        return;
       }
 
-      router.push(callbackUrl)
-    })
-  })
+      router.push(callbackUrl);
+    });
+  });
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/30 px-4">
@@ -115,5 +115,5 @@ export default function LoginPage() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }
