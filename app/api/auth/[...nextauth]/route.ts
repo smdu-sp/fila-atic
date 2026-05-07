@@ -42,8 +42,15 @@ const authOptions: NextAuthOptions = {
         }
 
         try {
-          const ldapUrl = process.env.LDAP_URL;
-          const baseDn = process.env.LDAP_BASE_DN;
+          const ldapUrl = process.env.LDAP_URL ?? process.env.LDAP_SERVER;
+          const baseDn = process.env.LDAP_BASE_DN ?? process.env.LDAP_BASE;
+          const adminDn =
+            process.env.LDAP_BIND_DN ??
+            (process.env.USER_LDAP
+              ? `${process.env.USER_LDAP}${process.env.LDAP_DOMAIN ?? ""}`
+              : undefined);
+          const adminPassword =
+            process.env.LDAP_BIND_PASSWORD ?? process.env.PASS_LDAP;
 
           if (!ldapUrl || !baseDn) {
             throw new Error("LDAP nao configurado");
@@ -51,8 +58,8 @@ const authOptions: NextAuthOptions = {
 
           const ldapUser = (await authenticate({
             ldapOpts: { url: ldapUrl },
-            adminDn: process.env.LDAP_BIND_DN,
-            adminPassword: process.env.LDAP_BIND_PASSWORD,
+            adminDn,
+            adminPassword,
             userSearchBase: baseDn,
             usernameAttribute: "sAMAccountName",
             username: login,
@@ -112,6 +119,16 @@ const authOptions: NextAuthOptions = {
 
           if (normalized.includes("connect") || normalized.includes("econn")) {
             throw new Error("Erro de conexao com o servidor de autenticacao");
+          }
+
+          if (
+            normalized.includes("invalid credentials") ||
+            normalized.includes("invalid password") ||
+            normalized.includes("invalid user") ||
+            normalized.includes("invalid") ||
+            normalized.includes("data 52e")
+          ) {
+            throw new Error("Credenciais invalidas");
           }
 
           if (message) {

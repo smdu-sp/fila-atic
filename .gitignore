@@ -33,6 +33,14 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# secrets and certs
+*.key
+*.pfx
+*.crt
+*.cer
+*.der
+*.p12
+
 # vercel
 .vercel
 

@@ -1,0 +1,18 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: fila_atic_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: rootpassword
+      POSTGRES_DB: fila_atic_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - fila_atic_data:/var/lib/postgresql/data
+
+volumes:
+  fila_atic_data:
