@@ -1,5 +1,6 @@
 "use server";
 
+import { COORDINATION_ROLES, isCoordination } from "@/lib/roles";
 import { Role } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
@@ -39,18 +40,18 @@ async function getUserOrError(): Promise<
   };
 }
 
-// Demoting or deactivating the only active coordinator would lock everyone
-// out of user management.
+// Demoting or deactivating the only active coordinator (or tech lead, who has
+// the same powers) would lock everyone out of user management.
 async function isLastActiveCoordinator(userId: string) {
   const target = await prisma.user.findUnique({
     where: { id: userId },
     select: { role: true, isActive: true },
   });
 
-  if (target?.role !== Role.COORDINATOR || !target.isActive) return false;
+  if (!target || !isCoordination(target.role) || !target.isActive) return false;
 
   const others = await prisma.user.count({
-    where: { role: Role.COORDINATOR, isActive: true, id: { not: userId } },
+    where: { role: { in: COORDINATION_ROLES }, isActive: true, id: { not: userId } },
   });
 
   return others === 0;
@@ -72,7 +73,7 @@ export async function listUsers(): Promise<
   const auth = await getUserOrError();
   if (!auth.success) return auth;
 
-  if (auth.data.role !== Role.COORDINATOR) {
+  if (!isCoordination(auth.data.role)) {
     return { success: false, error: "Sem permissao" };
   }
 
@@ -99,7 +100,7 @@ export async function updateUserRole(
   const auth = await getUserOrError();
   if (!auth.success) return auth;
 
-  if (auth.data.role !== Role.COORDINATOR) {
+  if (!isCoordination(auth.data.role)) {
     return { success: false, error: "Sem permissao" };
   }
 
@@ -117,7 +118,7 @@ export async function updateUserRole(
   }
 
   if (
-    input.role !== Role.COORDINATOR &&
+    !isCoordination(input.role) &&
     (await isLastActiveCoordinator(input.userId))
   ) {
     return {
@@ -142,7 +143,7 @@ export async function updateUserStatus(
   const auth = await getUserOrError();
   if (!auth.success) return auth;
 
-  if (auth.data.role !== Role.COORDINATOR) {
+  if (!isCoordination(auth.data.role)) {
     return { success: false, error: "Sem permissao" };
   }
 
@@ -182,7 +183,7 @@ export async function createUser(
   const auth = await getUserOrError();
   if (!auth.success) return auth;
 
-  if (auth.data.role !== Role.COORDINATOR) {
+  if (!isCoordination(auth.data.role)) {
     return { success: false, error: "Sem permissao" };
   }
 

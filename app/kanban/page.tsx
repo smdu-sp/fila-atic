@@ -1,5 +1,6 @@
 import { Role } from "@prisma/client";
 
+import { COORDINATION_ROLES, isCoordination } from "@/lib/roles";
 import { listProjects } from "@/actions/projectActions";
 import { listAssignableDevelopers } from "@/actions/solicitacaoActions";
 import { listTaskStatusLabels } from "@/actions/taskStatusActions";
@@ -19,7 +20,7 @@ export default async function KanbanPage({
 }: {
   searchParams: Promise<{ projeto?: string }>;
 }) {
-  await requireRole([Role.COORDINATOR, Role.DEV_GLOBAL, Role.DEV_RESTRICTED]);
+  await requireRole([...COORDINATION_ROLES, Role.DEV_GLOBAL, Role.DEV_RESTRICTED]);
   // /kanban?projeto=<id> opens the task board of that project
   const { projeto } = await searchParams;
 
@@ -32,7 +33,7 @@ export default async function KanbanPage({
     ]);
   const projects = projectsResult.success ? projectsResult.data : [];
   const labels = labelsResult.success ? labelsResult.data : taskStatusLabels;
-  const canEditStatusLabels = session?.user?.role === Role.COORDINATOR;
+  const canEditStatusLabels = isCoordination(session?.user?.role);
   // Only roles allowed to assign tasks get the list; others get an empty one.
   const assignees = developersResult.success
     ? developersResult.data.map(({ id, name }) => ({ id, name }))

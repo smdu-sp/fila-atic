@@ -11,6 +11,8 @@ enum Role {
   COORDINATOR
   DEV_GLOBAL
   DEV_RESTRICTED
+  // Same permissions as COORDINATOR (see isCoordination in lib/roles.ts).
+  TECH_LEAD
 }
 
 enum ProjectPriority {

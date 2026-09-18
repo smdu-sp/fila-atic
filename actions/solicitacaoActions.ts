@@ -1,5 +1,6 @@
 "use server";
 
+import { isManagerRole } from "@/lib/roles";
 import { ProjectPriority, ProjectStatus, Role } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
@@ -79,8 +80,7 @@ export async function listAssignableDevelopers(): Promise<
   if (!auth.success) return auth;
 
   if (
-    auth.data.role !== Role.COORDINATOR &&
-    auth.data.role !== Role.DEV_GLOBAL
+    !isManagerRole(auth.data.role)
   ) {
     return { success: false, error: "Sem permissao" };
   }

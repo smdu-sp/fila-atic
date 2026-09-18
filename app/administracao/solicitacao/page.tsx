@@ -1,5 +1,4 @@
-import { Role } from "@prisma/client";
-
+import { COORDINATION_ROLES, isCoordination } from "@/lib/roles";
 import { listProjectRequestFields } from "@/actions/requestFormActions";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
@@ -19,14 +18,14 @@ import { getServerAuthSession, requireRole } from "@/lib/auth";
 import { RequestFormSettings } from "@/app/administracao/solicitacao/_components/request-form-settings";
 
 export default async function SolicitationAdminPage() {
-  await requireRole([Role.COORDINATOR]);
+  await requireRole(COORDINATION_ROLES);
 
   const [fieldsResult, session] = await Promise.all([
     listProjectRequestFields({ includeInactive: true }),
     getServerAuthSession(),
   ]);
 
-  const canManage = session?.user?.role === Role.COORDINATOR;
+  const canManage = isCoordination(session?.user?.role);
 
   return (
     <div className="relative w-full overflow-x-hidden">

@@ -1,5 +1,6 @@
 "use server";
 
+import { isCoordination } from "@/lib/roles";
 import {
   ProjectPriority,
   ProjectStatus,
@@ -46,7 +47,7 @@ export async function listQueueProjects(): Promise<
   const auth = await getUserOrError();
   if (!auth.success) return auth;
 
-  if (auth.data.role !== Role.COORDINATOR) {
+  if (!isCoordination(auth.data.role)) {
     return { success: false, error: "Sem permissao" };
   }
 
@@ -104,7 +105,7 @@ export async function searchQueue(
   const auth = await getUserOrError();
   if (!auth.success) return auth;
 
-  if (auth.data.role !== Role.COORDINATOR) {
+  if (!isCoordination(auth.data.role)) {
     return { success: false, error: "Sem permissao" };
   }
 
@@ -186,7 +187,7 @@ export async function queueStats(): Promise<
   const auth = await getUserOrError();
   if (!auth.success) return auth;
 
-  if (auth.data.role !== Role.COORDINATOR) {
+  if (!isCoordination(auth.data.role)) {
     return { success: false, error: "Sem permissao" };
   }
 

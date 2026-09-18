@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { isCoordination } from "@/lib/roles";
 import { Role } from "@prisma/client";
 import { FileText } from "lucide-react";
 
@@ -76,7 +77,7 @@ export default async function SolicitacaoDetalhePage({
   const projectTasks = tasksResult?.success ? tasksResult.data : [];
   const taskLabels = labelsResult?.success ? labelsResult.data : defaultTaskLabels;
   const canRespond =
-    session?.user?.role === Role.COORDINATOR ||
+    isCoordination(session?.user?.role) ||
     session?.user?.role === Role.DEV_GLOBAL;
   const currentUserName = session?.user?.name ?? "";
   const assignableDevelopers = developersResult.success

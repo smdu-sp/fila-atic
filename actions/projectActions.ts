@@ -1,5 +1,6 @@
 "use server";
 
+import { isCoordination, isManagerRole } from "@/lib/roles";
 import {
   ProjectPriority,
   ProjectStatus,
@@ -84,7 +85,7 @@ async function getUserOrError(): Promise<
 }
 
 function canManageProject(role: Role) {
-  return role === Role.COORDINATOR || role === Role.DEV_GLOBAL;
+  return isCoordination(role) || role === Role.DEV_GLOBAL;
 }
 
 export async function createProject(
@@ -95,7 +96,7 @@ export async function createProject(
 
   if (
     auth.data.role !== Role.REQUESTER &&
-    auth.data.role !== Role.COORDINATOR
+    !isCoordination(auth.data.role)
   ) {
     return { success: false, error: "Sem permissao" };
   }
@@ -301,7 +302,7 @@ export async function deleteProject(
   const auth = await getUserOrError();
   if (!auth.success) return auth;
 
-  if (auth.data.role !== Role.COORDINATOR) {
+  if (!isCoordination(auth.data.role)) {
     return { success: false, error: "Sem permissao" };
   }
 
@@ -524,8 +525,7 @@ export async function assignDeveloper(
   if (!auth.success) return auth;
 
   if (
-    auth.data.role !== Role.COORDINATOR &&
-    auth.data.role !== Role.DEV_GLOBAL
+    !isManagerRole(auth.data.role)
   ) {
     return { success: false, error: "Sem permissao" };
   }
@@ -593,8 +593,7 @@ export async function removeDeveloper(
   if (!auth.success) return auth;
 
   if (
-    auth.data.role !== Role.COORDINATOR &&
-    auth.data.role !== Role.DEV_GLOBAL
+    !isManagerRole(auth.data.role)
   ) {
     return { success: false, error: "Sem permissao" };
   }

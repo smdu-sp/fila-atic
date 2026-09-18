@@ -1,5 +1,6 @@
 import { ProjectStatus, Role } from "@prisma/client";
 
+import { isCoordination } from "@/lib/roles";
 import { listDashboardCharts } from "@/actions/dashboardActions";
 import { listProjectLogs } from "@/actions/logActions";
 import { listProjects } from "@/actions/projectActions";
@@ -54,7 +55,7 @@ export default async function Page() {
   const logs = logsResult.success ? logsResult.data : [];
   const charts = chartsResult.success ? chartsResult.data : null;
   const requestFields = fieldsResult.success ? fieldsResult.data : [];
-  const isCoordinator = session?.user?.role === Role.COORDINATOR;
+  const isCoordinator = isCoordination(session?.user?.role);
   const isRequester = session?.user?.role === Role.REQUESTER;
   const totalQueue = projects.filter(
     (project) => project.status === ProjectStatus.IN_QUEUE,

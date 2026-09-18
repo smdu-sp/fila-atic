@@ -1,5 +1,6 @@
 "use client";
 
+import { COORDINATION_ROLES } from "@/lib/roles";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -31,26 +32,26 @@ const menuGeral = [
       Role.REQUESTER,
       Role.DEV_RESTRICTED,
       Role.DEV_GLOBAL,
-      Role.COORDINATOR,
+      ...COORDINATION_ROLES,
     ],
   },
   {
     title: "Fila de demandas",
     url: "/fila",
     icon: ListIcon,
-    roles: [Role.COORDINATOR],
+    roles: COORDINATION_ROLES,
   },
   {
     title: "Projetos",
     url: "/projetos",
     icon: FolderIcon,
-    roles: [Role.DEV_RESTRICTED, Role.DEV_GLOBAL, Role.COORDINATOR],
+    roles: [Role.DEV_RESTRICTED, Role.DEV_GLOBAL, ...COORDINATION_ROLES],
   },
   {
     title: "Kanban",
     url: "/kanban",
     icon: LayoutIcon,
-    roles: [Role.DEV_RESTRICTED, Role.DEV_GLOBAL, Role.COORDINATOR],
+    roles: [Role.DEV_RESTRICTED, Role.DEV_GLOBAL, ...COORDINATION_ROLES],
   },
 ];
 
@@ -59,19 +60,19 @@ const menuAdmin = [
     title: "Usuários",
     url: "/usuarios",
     icon: UserIcon,
-    roles: [Role.COORDINATOR],
+    roles: COORDINATION_ROLES,
   },
   {
     title: "Configurar formulário",
     url: "/administracao/solicitacao",
     icon: SettingsIcon,
-    roles: [Role.COORDINATOR],
+    roles: COORDINATION_ROLES,
   },
   {
     title: "Logs",
     url: "/logs",
     icon: FileTextIcon,
-    roles: [Role.DEV_RESTRICTED, Role.DEV_GLOBAL, Role.COORDINATOR],
+    roles: [Role.DEV_RESTRICTED, Role.DEV_GLOBAL, ...COORDINATION_ROLES],
   },
 ];
 

@@ -1,5 +1,6 @@
 "use server";
 
+import { isManagerRole } from "@/lib/roles";
 import { Role, TaskStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
@@ -53,14 +54,11 @@ async function getUserOrError(): Promise<
   };
 }
 
-const isManager = (role: Role) =>
-  role === Role.COORDINATOR || role === Role.DEV_GLOBAL;
-
 // Handing a task to someone also puts them on the project team, so that is
 // reserved to managers. A restricted developer may only keep a task for
 // themselves or leave it without an owner.
 function mayAssign(auth: { id: string; role: Role }, assigneeId: string | null) {
-  return isManager(auth.role) || assigneeId === null || assigneeId === auth.id;
+  return isManagerRole(auth.role) || assigneeId === null || assigneeId === auth.id;
 }
 
 async function findAssignee(assigneeId: string) {
@@ -199,7 +197,7 @@ export async function updateTask(
     return { success: false, error: "Sem permissao" };
   }
 
-  if (!isManager(auth.data.role) && task.assigneeId !== auth.data.id) {
+  if (!isManagerRole(auth.data.role) && task.assigneeId !== auth.data.id) {
     return { success: false, error: "Sem permissao" };
   }
 
@@ -297,7 +295,7 @@ export async function deleteTask(taskId: string): Promise<ActionResult<void>> {
   const auth = await getUserOrError();
   if (!auth.success) return auth;
 
-  if (!isManager(auth.data.role)) {
+  if (!isManagerRole(auth.data.role)) {
     return { success: false, error: "Sem permissao" };
   }
 

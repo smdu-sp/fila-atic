@@ -15,6 +15,7 @@ Sistema interno de fila de chamados/projetos de TI. Solicitantes abrem pedidos, 
 | --- | --- | --- |
 | `REQUESTER` | Solicitante | Abre chamados e acompanha os próprios |
 | `COORDINATOR` | Coordenador | Fila de entrada, usuários, formulário de solicitação, todos os projetos |
+| `TECH_LEAD` | Tech Lead | Mesmas permissões do coordenador (todas as verificações passam por `isCoordination` em `lib/roles.ts`) |
 | `DEV_GLOBAL` | DEV II | Todos os projetos, atribuição de desenvolvedores e tarefas |
 | `DEV_RESTRICTED` | DEV I | Apenas projetos em que foi atribuído |
 

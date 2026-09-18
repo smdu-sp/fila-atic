@@ -1,8 +1,7 @@
 "use server";
 
+import { isCoordination } from "@/lib/roles";
 import { z } from "zod";
-import { Role } from "@prisma/client";
-
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import {
@@ -60,7 +59,7 @@ export async function createProjectRequestField(): Promise<
     return { success: false, error: "Nao autenticado" };
   }
 
-  if (user.role !== Role.COORDINATOR) {
+  if (!isCoordination(user.role)) {
     return { success: false, error: "Sem permissao" };
   }
 
@@ -110,7 +109,7 @@ export async function deleteProjectRequestField(
     return { success: false, error: "Nao autenticado" };
   }
 
-  if (user.role !== Role.COORDINATOR) {
+  if (!isCoordination(user.role)) {
     return { success: false, error: "Sem permissao" };
   }
 
@@ -144,7 +143,7 @@ export async function updateProjectRequestFields(
     return { success: false, error: "Nao autenticado" };
   }
 
-  if (user.role !== Role.COORDINATOR) {
+  if (!isCoordination(user.role)) {
     return { success: false, error: "Sem permissao" };
   }
 

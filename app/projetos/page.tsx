@@ -1,5 +1,6 @@
 import { ProjectPriority, ProjectStatus, Role } from "@prisma/client";
 
+import { COORDINATION_ROLES, isCoordination } from "@/lib/roles";
 import { listAssignableDevelopers } from "@/actions/solicitacaoActions";
 import { searchProjects, type ProjectSearch } from "@/actions/projectActions";
 import { listProjectRequestFields } from "@/actions/requestFormActions";
@@ -58,7 +59,7 @@ export default async function ProjetosPage({
 }: {
   searchParams: SearchParams;
 }) {
-  await requireRole([Role.COORDINATOR, Role.DEV_GLOBAL, Role.DEV_RESTRICTED]);
+  await requireRole([...COORDINATION_ROLES, Role.DEV_GLOBAL, Role.DEV_RESTRICTED]);
 
   const raw = await searchParams;
   const filters = {
@@ -91,7 +92,7 @@ export default async function ProjetosPage({
   const requestFields = fieldsResult.success ? fieldsResult.data : [];
   const developers = developersResult.success ? developersResult.data : [];
   const canManage =
-    session?.user?.role === Role.COORDINATOR ||
+    isCoordination(session?.user?.role) ||
     session?.user?.role === Role.DEV_GLOBAL;
 
   const filterFields: FilterField[] = [

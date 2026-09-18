@@ -1,5 +1,6 @@
 "use server";
 
+import { isCoordination } from "@/lib/roles";
 import { ProjectStatus, Role } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
@@ -45,7 +46,7 @@ export async function listDashboardCharts(): Promise<
   const roleResult = await getUserRole();
   if (!roleResult.success) return roleResult;
 
-  if (roleResult.data !== Role.COORDINATOR) {
+  if (!isCoordination(roleResult.data)) {
     return { success: false, error: "Sem permissao" };
   }
 

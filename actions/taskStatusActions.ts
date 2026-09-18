@@ -1,6 +1,7 @@
 "use server";
 
-import { Role, TaskStatus } from "@prisma/client";
+import { isCoordination } from "@/lib/roles";
+import { TaskStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
 import { prisma } from "@/lib/prisma";
@@ -38,7 +39,7 @@ export async function updateTaskStatusLabels(
     return { success: false, error: "Nao autenticado" };
   }
 
-  if (user.role !== Role.COORDINATOR) {
+  if (!isCoordination(user.role)) {
     return { success: false, error: "Sem permissao" };
   }
 

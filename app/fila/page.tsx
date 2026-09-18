@@ -1,5 +1,6 @@
-import { ProjectPriority, Role } from "@prisma/client";
+import { ProjectPriority } from "@prisma/client";
 
+import { COORDINATION_ROLES } from "@/lib/roles";
 import {
   queueStats,
   searchQueue,
@@ -79,7 +80,7 @@ export default async function FilaPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requireRole([Role.COORDINATOR]);
+  await requireRole(COORDINATION_ROLES);
 
   const raw = await searchParams;
   const filters = {

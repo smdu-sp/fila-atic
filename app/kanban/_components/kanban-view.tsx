@@ -1,5 +1,6 @@
 "use client";
 
+import { isCoordination } from "@/lib/roles";
 import {
   useEffect,
   useMemo,
@@ -191,7 +192,7 @@ export function KanbanView({
   const teamIdsOf = (projectId: string | undefined) =>
     projectItems.find((project) => project.id === projectId)?.developerIds ??
     [];
-  const isManager = role === Role.COORDINATOR || role === Role.DEV_GLOBAL;
+  const isManager = isCoordination(role) || role === Role.DEV_GLOBAL;
   const canAssign = assignees.length > 0;
   const canMoveProjects = role !== Role.REQUESTER;
   const canMoveTask = (task: TaskItem) =>

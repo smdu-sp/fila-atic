@@ -1,5 +1,6 @@
 import { Role } from "@prisma/client";
 
+import { COORDINATION_ROLES } from "@/lib/roles";
 import { searchProjectLogs, type LogSearch } from "@/actions/logActions";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ListFilters, type FilterField } from "@/components/list-filters";
@@ -43,7 +44,7 @@ export default async function LogsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requireRole([Role.COORDINATOR, Role.DEV_GLOBAL, Role.DEV_RESTRICTED]);
+  await requireRole([...COORDINATION_ROLES, Role.DEV_GLOBAL, Role.DEV_RESTRICTED]);
 
   const raw = await searchParams;
   const filters = {

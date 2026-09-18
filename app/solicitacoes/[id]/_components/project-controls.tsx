@@ -1,5 +1,6 @@
 "use client";
 
+import { isCoordination } from "@/lib/roles";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Role, ProjectPriority, ProjectStatus } from "@prisma/client";
@@ -64,7 +65,7 @@ export function ProjectControls({
     toast.success("Status atualizado.");
     router.refresh();
   });
-  const canManageAll = role === Role.COORDINATOR || role === Role.DEV_GLOBAL;
+  const canManageAll = isCoordination(role) || role === Role.DEV_GLOBAL;
   const canUpdateStatus = canManageAll || role === Role.DEV_RESTRICTED;
 
   const availableDevelopers = useMemo(() => {
