@@ -1,6 +1,7 @@
 "use client";
 
-import { signOut } from "next-auth/react";
+import Link from "next/link";
+import { signOut, useSession } from "next-auth/react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -18,16 +19,12 @@ import {
 } from "@/components/ui/sidebar";
 import { LogOut, MoreVertical, UserCircle } from "lucide-react";
 
-export function NavUser({
-  user,
-}: {
-  user: {
-    name: string;
-    email: string;
-  };
-}) {
+export function NavUser() {
   const { isMobile } = useSidebar();
-  const initials = user.name
+  const { data: session } = useSession();
+  const name = session?.user?.name ?? "Usuario";
+  const email = session?.user?.email ?? "";
+  const initials = name
     .split(" ")
     .map((part) => part[0])
     .slice(0, 2)
@@ -49,10 +46,12 @@ export function NavUser({
                 </AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">{user.name}</span>
-                <span className="truncate text-xs text-muted-foreground">
-                  {user.email}
-                </span>
+                <span className="truncate font-semibold">{name}</span>
+                {email ? (
+                  <span className="truncate text-xs text-muted-foreground">
+                    {email}
+                  </span>
+                ) : null}
               </div>
               <MoreVertical className="ml-auto size-4" />
             </SidebarMenuButton>
@@ -71,17 +70,21 @@ export function NavUser({
                   </AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">{user.name}</span>
-                  <span className="truncate text-xs text-muted-foreground">
-                    {user.email}
-                  </span>
+                  <span className="truncate font-semibold">{name}</span>
+                  {email ? (
+                    <span className="truncate text-xs text-muted-foreground">
+                      {email}
+                    </span>
+                  ) : null}
                 </div>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <UserCircle />
-              Perfil
+            <DropdownMenuItem asChild>
+              <Link href="/perfil">
+                <UserCircle />
+                Perfil
+              </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem

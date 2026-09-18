@@ -14,11 +14,6 @@ import { NavMain } from "@/components/nav-main";
 import { NavUser } from "@/components/nav-user";
 import { SidebarToggleButton } from "@/components/sidebar-toggle";
 
-const user = {
-  name: "Equipe ATIC",
-  email: "atic@smul.sp.gov.br",
-};
-
 export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -31,7 +26,7 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <NavMain />
       <SidebarFooter>
-        <NavUser user={user} />
+        <NavUser />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
