@@ -22,6 +22,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { DueBadge } from "@/components/due-badge";
 import { Separator } from "@/components/ui/separator";
 import {
   SidebarInset,
@@ -30,6 +31,7 @@ import {
 } from "@/components/ui/sidebar";
 import Link from "next/link";
 import { getServerAuthSession } from "@/lib/auth";
+import { dueState } from "@/lib/dueDate";
 import { CreateProjectForm } from "@/app/projetos/_components/create-project-form";
 import {
   getStatusBadgeClass,
@@ -67,6 +69,15 @@ export default async function Page() {
     (project) => project.status === ProjectStatus.FINISHED,
   ).length;
 
+  const totalOverdue = projects.filter(
+    (project) =>
+      dueState(project.dueDate, {
+        closed:
+          project.status === ProjectStatus.FINISHED ||
+          project.status === ProjectStatus.CANCELED,
+      }).kind === "overdue",
+  ).length;
+
   const stats = [
     {
       title: "Na fila",
@@ -87,6 +98,11 @@ export default async function Page() {
       title: "Finalizados",
       value: String(totalFinished),
       description: "Entregas concluidas",
+    },
+    {
+      title: "Atrasados",
+      value: String(totalOverdue),
+      description: "Passaram da previsão de entrega",
     },
   ];
 
@@ -152,10 +168,13 @@ export default async function Page() {
                   <DialogTrigger asChild>
                     <Button>Abrir nova solicitação</Button>
                   </DialogTrigger>
-                  <DialogContent className="max-h-[85vh] overflow-y-auto">
+                  <DialogContent>
                     <DialogHeader>
                       <DialogTitle>Nova solicitação</DialogTitle>
-                      <DialogDescription></DialogDescription>
+                      <DialogDescription>
+                        Descreva o que você precisa. A coordenação faz a
+                        triagem e define a prioridade.
+                      </DialogDescription>
                     </DialogHeader>
                     <CreateProjectForm fields={requestFields} />
                   </DialogContent>
@@ -199,6 +218,7 @@ export default async function Page() {
                             >
                               {getStatusLabel(project.status)}
                             </Badge>
+                            <DueBadge dueDate={project.dueDate} />
                           </div>
                         </div>
                       ))
@@ -241,7 +261,7 @@ export default async function Page() {
               </div>
             ) : (
               <>
-                <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
                   {stats.map((item) => (
                     <Card key={item.title}>
                       <CardHeader className="pb-2">

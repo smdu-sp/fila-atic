@@ -10,6 +10,7 @@ import { updateProject } from "@/actions/projectActions";
 import { updateProjectStatusRestricted } from "@/actions/solicitacaoActions";
 import { CreateTaskForm } from "@/app/kanban/_components/create-task-form";
 import { UserAvatar } from "@/app/kanban/_components/board-ui";
+import { DueBadge } from "@/components/due-badge";
 import { TaskProgress } from "@/components/task-progress";
 import { useStatusChangeGuard } from "@/components/use-status-change";
 import { Badge } from "@/components/ui/badge";
@@ -28,13 +29,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { summarizeTasks } from "@/lib/taskStatus";
+import { isTaskOpen, summarizeTasks } from "@/lib/taskStatus";
 
 type PanelTask = {
   id: string;
   title: string;
   status: TaskStatus;
   assigneeName: string | null;
+  dueDate: Date | null;
 };
 
 type PanelProps = {
@@ -149,6 +151,10 @@ export function ProjectTasksPanel({
                   {task.title}
                 </span>
                 <span className="flex shrink-0 items-center gap-2">
+                  <DueBadge
+                    dueDate={task.dueDate}
+                    closed={!isTaskOpen(task.status)}
+                  />
                   <Badge variant="outline">{taskLabels[task.status]}</Badge>
                   {task.assigneeName ? (
                     <UserAvatar name={task.assigneeName} />

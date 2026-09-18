@@ -10,6 +10,8 @@ import { TaskStatus } from "@prisma/client";
 import { createTask } from "@/actions/taskActions";
 import { AssigneeItems } from "@/app/kanban/_components/assignee-items";
 import { Button } from "@/components/ui/button";
+import { DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import {
@@ -28,6 +30,7 @@ const schema = z.object({
   description: z.string().optional(),
   status: z.nativeEnum(TaskStatus).optional(),
   assigneeId: z.string().optional(),
+  dueDate: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -63,6 +66,7 @@ export function CreateTaskForm({
         description: "",
         status: initialStatus,
         assigneeId: "",
+        dueDate: "",
       },
     });
 
@@ -74,6 +78,7 @@ export function CreateTaskForm({
         description: "",
         status: initialStatus,
         assigneeId: "",
+        dueDate: "",
       });
     }
   }, [initialProjectId, initialStatus, reset]);
@@ -86,6 +91,7 @@ export function CreateTaskForm({
         description: values.description,
         status: values.status,
         assigneeId: values.assigneeId || null,
+        dueDate: values.dueDate || null,
       });
 
       if (!result.success) {
@@ -100,22 +106,24 @@ export function CreateTaskForm({
         description: "",
         status: values.status,
         assigneeId: "",
+        dueDate: "",
       });
       onCreated?.();
     });
   });
 
   return (
-    <Form onSubmit={onSubmit} className="grid gap-3">
+    <Form onSubmit={onSubmit} className="grid gap-4">
       {hideProjectSelect ? null : (
-        <>
+        <div className="grid gap-1.5">
+          <Label htmlFor="task-project">Projeto</Label>
           <Controller
             control={control}
             name="projectId"
             render={({ field }) => (
               <Select value={field.value} onValueChange={field.onChange}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Projeto" />
+                <SelectTrigger id="task-project" className="w-full">
+                  <SelectValue placeholder="Selecione o projeto" />
                 </SelectTrigger>
                 <SelectContent>
                   {projects.map((project) => (
@@ -132,41 +140,64 @@ export function CreateTaskForm({
               {formState.errors.projectId.message}
             </span>
           ) : null}
-        </>
+        </div>
       )}
-      <div className="grid gap-2">
-        <Input placeholder="Título da tarefa" {...register("title")} />
+      <div className="grid gap-1.5">
+        <Label htmlFor="task-title">Título</Label>
+        <Input
+          id="task-title"
+          placeholder="O que precisa ser feito"
+          {...register("title")}
+        />
         {formState.errors.title ? (
           <span className="text-xs text-destructive">
             {formState.errors.title.message}
           </span>
         ) : null}
       </div>
-      <Input placeholder="Descrição (opcional)" {...register("description")} />
-      {assignees.length ? (
-        <Controller
-          control={control}
-          name="assigneeId"
-          render={({ field }) => (
-            <Select
-              value={field.value || "none"}
-              onValueChange={(value) =>
-                field.onChange(value === "none" ? "" : value)
-              }
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Responsável (opcional)" />
-              </SelectTrigger>
-              <SelectContent>
-                <AssigneeItems assignees={assignees} teamIds={teamIds} />
-              </SelectContent>
-            </Select>
-          )}
+      <div className="grid gap-1.5">
+        <Label htmlFor="task-description">Descrição (opcional)</Label>
+        <Input
+          id="task-description"
+          placeholder="Detalhes, links, critérios de aceite"
+          {...register("description")}
         />
-      ) : null}
-      <Button type="submit" disabled={isPending}>
-        {isPending ? "Criando" : "Criar tarefa"}
-      </Button>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        {assignees.length ? (
+          <div className="grid gap-1.5">
+            <Label htmlFor="task-assignee">Responsável (opcional)</Label>
+            <Controller
+              control={control}
+              name="assigneeId"
+              render={({ field }) => (
+                <Select
+                  value={field.value || "none"}
+                  onValueChange={(value) =>
+                    field.onChange(value === "none" ? "" : value)
+                  }
+                >
+                  <SelectTrigger id="task-assignee" className="w-full">
+                    <SelectValue placeholder="Sem responsável" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <AssigneeItems assignees={assignees} teamIds={teamIds} />
+                  </SelectContent>
+                </Select>
+              )}
+            />
+          </div>
+        ) : null}
+        <div className="grid gap-1.5">
+          <Label htmlFor="task-due">Prazo (opcional)</Label>
+          <Input id="task-due" type="date" {...register("dueDate")} />
+        </div>
+      </div>
+      <DialogFooter>
+        <Button type="submit" disabled={isPending}>
+          {isPending ? "Criando" : "Criar tarefa"}
+        </Button>
+      </DialogFooter>
     </Form>
   );
 }

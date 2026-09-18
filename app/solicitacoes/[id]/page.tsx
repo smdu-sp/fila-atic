@@ -8,6 +8,7 @@ import {
   listProjectMessages,
 } from "@/actions/solicitacaoActions";
 import { AppSidebar } from "@/components/app-sidebar";
+import { DueBadge } from "@/components/due-badge";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -25,6 +26,7 @@ import {
 import { listTasksByProject } from "@/actions/taskActions";
 import { listTaskStatusLabels } from "@/actions/taskStatusActions";
 import { getServerAuthSession } from "@/lib/auth";
+import { formatDueDate, toDateInput } from "@/lib/dueDate";
 import { taskStatusLabels as defaultTaskLabels } from "@/lib/projectLabels";
 import {
   getPriorityLabel,
@@ -133,6 +135,7 @@ export default async function SolicitacaoDetalhePage({
                   role={session?.user?.role ?? Role.REQUESTER}
                   defaultStatus={details.status}
                   defaultPriority={details.priority}
+                  defaultDueDate={toDateInput(details.dueDate)}
                   assignedDevelopers={details.developers.map((dev) => ({
                     id: dev.id,
                     name: dev.name,
@@ -150,6 +153,9 @@ export default async function SolicitacaoDetalhePage({
                   <CardTitle>{details.title}</CardTitle>
                   <CardDescription>
                     Criado em {details.createdAt.toLocaleDateString("pt-BR")}
+                    {details.dueDate
+                      ? ` · Previsão de entrega ${formatDueDate(details.dueDate)}`
+                      : ""}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4 text-sm">
@@ -165,6 +171,13 @@ export default async function SolicitacaoDetalhePage({
                         {getPriorityLabel(details.priority)}
                       </Badge>
                     ) : null}
+                    <DueBadge
+                      dueDate={details.dueDate}
+                      closed={
+                        details.status === "FINISHED" ||
+                        details.status === "CANCELED"
+                      }
+                    />
                   </div>
 
                   <div className="grid gap-2">

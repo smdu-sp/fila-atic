@@ -33,12 +33,14 @@ import {
 import { CreateTaskForm } from "@/app/kanban/_components/create-task-form";
 import { TaskProgress } from "@/components/task-progress";
 import { useStatusChangeGuard } from "@/components/use-status-change";
-import { summarizeTasks } from "@/lib/taskStatus";
+import { toDateInput } from "@/lib/dueDate";
+import { isTaskOpen, summarizeTasks } from "@/lib/taskStatus";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -65,6 +67,7 @@ type ProjectItem = {
   taskTotal: number;
   taskDone: number;
   developerIds: string[];
+  dueDate: Date | null;
 };
 
 type TaskItem = {
@@ -74,6 +77,7 @@ type TaskItem = {
   status: TaskStatus;
   assigneeId: string | null;
   assigneeName: string | null;
+  dueDate: Date | string | null;
   createdAt: string | Date;
   // only when tasks of several projects are listed together
   projectId?: string;
@@ -156,6 +160,7 @@ export function KanbanView({
   const [editDescription, setEditDescription] = useState("");
   const [editStatus, setEditStatus] = useState<TaskStatus>(TaskStatus.TODO);
   const [editAssignee, setEditAssignee] = useState(NO_ASSIGNEE);
+  const [editDueDate, setEditDueDate] = useState("");
   const [statusEditOpen, setStatusEditOpen] = useState(false);
   const [statusDraft, setStatusDraft] =
     useState<Record<TaskStatus, string>>(taskStatusLabels);
@@ -399,6 +404,7 @@ export function KanbanView({
     setEditDescription(task.description ?? "");
     setEditStatus(task.status);
     setEditAssignee(task.assigneeId ?? NO_ASSIGNEE);
+    setEditDueDate(toDateInput(task.dueDate));
     setEditOpen(true);
   };
 
@@ -412,6 +418,7 @@ export function KanbanView({
         id: editingTask.id,
         title,
         description: editDescription.trim() || null,
+        dueDate: editDueDate || null,
         status: editStatus,
         assigneeId: canAssign
           ? editAssignee === NO_ASSIGNEE
@@ -597,6 +604,8 @@ export function KanbanView({
                   requesterDepartment={item.requesterDepartment}
                   taskDone={item.taskDone}
                   taskTotal={item.taskTotal}
+                  dueDate={item.dueDate}
+                  closed={item.status === ProjectStatus.FINISHED}
                   draggable={canMoveProjects}
                   dragging={draggingId === item.id}
                   onDragStart={handleDragStart(item.id)}
@@ -652,6 +661,8 @@ export function KanbanView({
                       createdAt={item.createdAt}
                       assigneeName={item.assigneeName}
                       projectTitle={item.projectTitle}
+                      dueDate={item.dueDate}
+                      closed={!isTaskOpen(item.status)}
                       draggable={canMoveTask(item)}
                       dragging={draggingId === item.id}
                       onDragStart={handleDragStart(item.id)}
@@ -701,10 +712,10 @@ export function KanbanView({
           <DialogHeader>
             <DialogTitle>Editar tarefa</DialogTitle>
             <DialogDescription>
-              Atualize título, descrição, status e responsável da tarefa.
+              Atualize título, descrição, status, responsável e prazo.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-3">
+          <div className="grid gap-4">
             <div className="grid gap-1.5">
               <Label htmlFor="edit-title">Título</Label>
               <Input
@@ -723,29 +734,41 @@ export function KanbanView({
                 placeholder="Descrição"
               />
             </div>
-            <div className="grid gap-1.5">
-              <Label>Status</Label>
-              <Select
-                value={editStatus}
-                onValueChange={(value) => setEditStatus(value as TaskStatus)}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  {taskStatusOrder.map((status) => (
-                    <SelectItem key={status} value={status}>
-                      {statusLabelsState[status] ?? getTaskStatusLabel(status)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-1.5">
+                <Label htmlFor="edit-status">Status</Label>
+                <Select
+                  value={editStatus}
+                  onValueChange={(value) => setEditStatus(value as TaskStatus)}
+                >
+                  <SelectTrigger id="edit-status" className="w-full">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {taskStatusOrder.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {statusLabelsState[status] ??
+                          getTaskStatusLabel(status)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="edit-due">Prazo</Label>
+                <Input
+                  id="edit-due"
+                  type="date"
+                  value={editDueDate}
+                  onChange={(event) => setEditDueDate(event.target.value)}
+                />
+              </div>
             </div>
             {canAssign ? (
               <div className="grid gap-1.5">
-                <Label>Responsável</Label>
+                <Label htmlFor="edit-assignee">Responsável</Label>
                 <Select value={editAssignee} onValueChange={setEditAssignee}>
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger id="edit-assignee" className="w-full">
                     <SelectValue placeholder="Sem responsável" />
                   </SelectTrigger>
                   <SelectContent>
@@ -759,33 +782,34 @@ export function KanbanView({
                 </Select>
               </div>
             ) : null}
-            <div className="flex items-center justify-end gap-2">
-              <Button variant="ghost" onClick={() => setEditOpen(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleSaveEdit} disabled={isPending}>
-                {isPending ? "Salvando" : "Salvar"}
-              </Button>
-            </div>
           </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={isPending}>
+              {isPending ? "Salvando" : "Salvar"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={statusEditOpen} onOpenChange={setStatusEditOpen}>
-        <DialogContent>
+        <DialogContent size="lg">
           <DialogHeader>
             <DialogTitle>Editar colunas das tarefas</DialogTitle>
             <DialogDescription>
               Personalize os nomes usados no Kanban de tarefas.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-3">
+          <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
             {taskStatusOrder.map((status) => (
-              <div key={status} className="grid gap-1">
-                <span className="text-xs font-medium text-muted-foreground">
+              <div key={status} className="grid gap-1.5">
+                <Label htmlFor={`status-label-${status}`}>
                   {getTaskStatusLabel(status)}
-                </span>
+                </Label>
                 <Input
+                  id={`status-label-${status}`}
                   value={statusDraft[status] ?? ""}
                   onChange={(event) =>
                     setStatusDraft((prev) => ({
@@ -796,15 +820,15 @@ export function KanbanView({
                 />
               </div>
             ))}
-            <div className="flex items-center justify-end gap-2">
-              <Button variant="ghost" onClick={() => setStatusEditOpen(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleSaveStatusLabels} disabled={isPending}>
-                {isPending ? "Salvando" : "Salvar"}
-              </Button>
-            </div>
           </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setStatusEditOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveStatusLabels} disabled={isPending}>
+              {isPending ? "Salvando" : "Salvar"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

@@ -33,6 +33,8 @@ type ProjectControlsProps = {
   role: Role;
   defaultStatus: ProjectStatus;
   defaultPriority: ProjectPriority;
+  // "YYYY-MM-DD" of the delivery forecast, when there is one.
+  defaultDueDate?: string;
   assignedDevelopers: DeveloperOption[];
   assignableDevelopers: DeveloperOption[];
   variant?: "card" | "inline";
@@ -43,6 +45,7 @@ export function ProjectControls({
   role,
   defaultStatus,
   defaultPriority,
+  defaultDueDate = "",
   assignedDevelopers,
   assignableDevelopers,
   variant = "card",
@@ -182,6 +185,8 @@ export function ProjectControls({
               layout="inline"
               formId={updateFormId}
               showSubmit={false}
+              showDueDate
+              defaultDueDate={defaultDueDate}
             />
             <Select value={selectedDev} onValueChange={setSelectedDev}>
               <SelectTrigger className="w-[180px]" size="sm">

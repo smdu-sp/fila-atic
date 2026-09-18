@@ -5,6 +5,7 @@ import { FileText } from "lucide-react";
 
 import { GuestMessageForm } from "@/app/acompanhar/[token]/_components/guest-message-form";
 import { PublicShell } from "@/app/solicitar/_components/public-shell";
+import { DueBadge } from "@/components/due-badge";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -91,6 +92,7 @@ export default async function TrackRequestPage({
             {project.requesterName} · Prioridade{" "}
             {getPriorityLabel(project.priority).toLowerCase()}
           </CardDescription>
+          <DueBadge dueDate={project.dueDate} closed={isClosed} />
         </CardHeader>
         <CardContent className="grid gap-4 text-sm">
           <div>

@@ -1,15 +1,16 @@
 import { ProjectPriority, Role } from "@prisma/client";
-import { requireRole } from "@/lib/auth";
 
-import { listQueueProjects } from "@/actions/queueActions";
-import { AppSidebar } from "@/components/app-sidebar";
-import { Badge } from "@/components/ui/badge";
 import {
-  getPriorityLabel,
-  getStatusBadgeClass,
-  getStatusLabel,
-} from "@/lib/projectLabels";
-import Link from "next/link";
+  queueStats,
+  searchQueue,
+  type QueueSearch,
+} from "@/actions/queueActions";
+import { AppSidebar } from "@/components/app-sidebar";
+import { DueBadge } from "@/components/due-badge";
+import { ListFilters, type FilterField } from "@/components/list-filters";
+import { Pagination } from "@/components/pagination";
+import { ProjectUpdateForm } from "@/components/project-update-form";
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -23,7 +24,16 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { ProjectUpdateForm } from "@/components/project-update-form";
+import { requireRole } from "@/lib/auth";
+import { toDateInput } from "@/lib/dueDate";
+import { firstParam, oneOf, parsePage } from "@/lib/listParams";
+import {
+  getPriorityLabel,
+  getStatusBadgeClass,
+  getStatusLabel,
+  priorityLabels,
+} from "@/lib/projectLabels";
+import Link from "next/link";
 
 const priorityVariant: Record<
   ProjectPriority,
@@ -35,51 +45,94 @@ const priorityVariant: Record<
   URGENT: "destructive",
 };
 
-export default async function FilaPage() {
+const SORTS = ["newest", "priority"] as const;
+
+const filterFields: FilterField[] = [
+  {
+    type: "search",
+    name: "q",
+    placeholder: "Buscar por título, solicitante ou setor",
+  },
+  {
+    type: "select",
+    name: "prioridade",
+    label: "Prioridade",
+    options: Object.values(ProjectPriority).map((value) => ({
+      value,
+      label: priorityLabels[value],
+    })),
+  },
+  {
+    type: "select",
+    name: "ordem",
+    label: "Ordem",
+    allLabel: "Mais antigos primeiro",
+    options: [
+      { value: "newest", label: "Mais recentes primeiro" },
+      { value: "priority", label: "Maior prioridade primeiro" },
+    ],
+  },
+];
+
+export default async function FilaPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   await requireRole([Role.COORDINATOR]);
 
-  const result = await listQueueProjects();
-  const projects = result.success ? result.data : [];
-  const totalQueue = projects.length;
-  const highPriority = projects.filter(
-    (project) =>
-      project.priority === ProjectPriority.HIGH ||
-      project.priority === ProjectPriority.URGENT,
-  ).length;
-  const urgentPriority = projects.filter(
-    (project) => project.priority === ProjectPriority.URGENT,
-  ).length;
+  const raw = await searchParams;
+  const filters = {
+    q: firstParam(raw.q),
+    prioridade: oneOf(raw.prioridade, Object.values(ProjectPriority)),
+    ordem: oneOf(raw.ordem, SORTS),
+  };
+  const search: QueueSearch = {
+    q: filters.q,
+    priority: filters.prioridade,
+    sort: filters.ordem,
+    page: parsePage(raw.page),
+  };
+
+  const [result, statsResult] = await Promise.all([
+    searchQueue(search),
+    queueStats(),
+  ]);
+  const page = result.success ? result.data : null;
+  const stats = statsResult.success
+    ? statsResult.data
+    : { total: 0, high: 0, urgent: 0 };
 
   return (
     <div className="relative w-full overflow-x-hidden">
       <SidebarProvider>
         <AppSidebar />
         <SidebarInset className="min-w-0">
-          <header className="hidden h-16 shrink-0 items-center gap-2 bg-muted/50 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12 sm:flex">
+          <header className="hidden h-16 shrink-0 items-center gap-2 bg-muted/50 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 sm:flex">
             <div className="flex items-center gap-2 px-3 sm:px-4">
               <SidebarTrigger className="-ml-1 md:hidden" />
               <Separator
                 orientation="vertical"
-                className="mr-2 h-4 md:ml-[-16px]"
+                className="mr-2 h-4 md:-ml-4"
               />
               <div className="flex flex-col">
                 <span className="text-sm font-semibold">Fila de demandas</span>
               </div>
             </div>
           </header>
-          <div className="w-full min-w-0 bg-muted/50 p-4 pt-6 sm:gap-4 sm:p-6 sm:pt-4">
+          <div className="grid w-full min-w-0 gap-6 bg-muted/50 p-4 pt-6 sm:p-6 sm:pt-4">
             <div className="flex flex-col gap-1">
               <h1 className="text-2xl font-semibold">Fila de demandas</h1>
               <p className="text-sm text-muted-foreground">
-                Priorize e acompanhe as novas solicitacoes recebidas.
+                Priorize e acompanhe as novas solicitações recebidas.
               </p>
             </div>
 
-            <div className="mt-6 grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-3">
               {[
-                { label: "Total na fila", value: String(totalQueue) },
-                { label: "Prioridade alta", value: String(highPriority) },
-                { label: "Urgentes", value: String(urgentPriority) },
+                { label: "Total na fila", value: stats.total },
+                { label: "Prioridade alta", value: stats.high },
+                { label: "Urgentes", value: stats.urgent },
               ].map((item) => (
                 <Card key={item.label}>
                   <CardHeader className="pb-2">
@@ -90,23 +143,32 @@ export default async function FilaPage() {
               ))}
             </div>
 
-            <Card className="mt-6">
+            <ListFilters fields={filterFields} />
+
+            <Card>
               <CardHeader>
-                <CardTitle>Demandas aguardando avaliacao</CardTitle>
+                <CardTitle>Demandas aguardando avaliação</CardTitle>
                 <CardDescription>
-                  Confirme escopo, prioridade e designacao inicial.
+                  Confirme escopo, prioridade, previsão e designação inicial.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="grid gap-3">
                 {!result.success ? (
                   <div className="text-sm text-destructive">{result.error}</div>
                 ) : null}
-                {projects.map((item) => (
+                {page && page.items.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-muted-foreground">
+                    {stats.total === 0
+                      ? "A fila está vazia."
+                      : "Nenhuma demanda encontrada com esses filtros."}
+                  </p>
+                ) : null}
+                {page?.items.map((item) => (
                   <div
                     key={item.id}
                     className="flex flex-col gap-3 rounded-lg border border-border/60 p-4 sm:flex-row sm:items-center sm:justify-between"
                   >
-                    <div>
+                    <div className="grid gap-1.5">
                       <Link
                         href={`/solicitacoes/${item.id}`}
                         className="text-sm font-semibold text-foreground hover:underline"
@@ -114,8 +176,10 @@ export default async function FilaPage() {
                         {item.title}
                       </Link>
                       <p className="text-xs text-muted-foreground">
-                        {item.requesterName} · {item.requesterDepartment}
+                        {item.requesterName} · {item.requesterDepartment} ·
+                        recebida em {item.createdAt.toLocaleDateString("pt-BR")}
                       </p>
+                      <DueBadge dueDate={item.dueDate} />
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge variant={priorityVariant[item.priority]}>
@@ -131,6 +195,8 @@ export default async function FilaPage() {
                         projectId={item.id}
                         defaultStatus={item.status}
                         defaultPriority={item.priority}
+                        showDueDate
+                        defaultDueDate={toDateInput(item.dueDate)}
                         compact
                       />
                     </div>
@@ -138,6 +204,17 @@ export default async function FilaPage() {
                 ))}
               </CardContent>
             </Card>
+
+            {page ? (
+              <Pagination
+                basePath="/fila"
+                params={filters}
+                page={page.page}
+                pageCount={page.pageCount}
+                pageSize={page.pageSize}
+                total={page.total}
+              />
+            ) : null}
           </div>
         </SidebarInset>
       </SidebarProvider>

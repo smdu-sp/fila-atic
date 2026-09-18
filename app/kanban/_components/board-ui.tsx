@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { DueBadge } from "@/components/due-badge";
 import { TaskProgress } from "@/components/task-progress";
 import { Button } from "@/components/ui/button";
 import { getPriorityLabel } from "@/lib/projectLabels";
@@ -196,6 +197,8 @@ export function ProjectCard({
   requesterDepartment,
   taskDone,
   taskTotal,
+  dueDate,
+  closed,
   draggable,
   dragging,
   onDragStart,
@@ -208,6 +211,8 @@ export function ProjectCard({
   requesterDepartment: string;
   taskDone: number;
   taskTotal: number;
+  dueDate: Date | string | null;
+  closed: boolean;
 }) {
   return (
     <article
@@ -230,6 +235,7 @@ export function ProjectCard({
       {taskTotal > 0 ? (
         <TaskProgress className="mt-2" done={taskDone} total={taskTotal} />
       ) : null}
+      <DueBadge dueDate={dueDate} closed={closed} className="mt-2" />
       <div className="mt-3 flex items-center justify-between gap-2">
         <span className="flex min-w-0 items-center gap-2">
           <span
@@ -256,6 +262,8 @@ export function TaskCard({
   createdAt,
   assigneeName,
   projectTitle,
+  dueDate,
+  closed,
   draggable,
   dragging,
   onDragStart,
@@ -265,6 +273,8 @@ export function TaskCard({
   title: string;
   createdAt: string | Date;
   assigneeName: string | null;
+  dueDate: Date | string | null;
+  closed: boolean;
   // Shown when tasks from several projects share the board ("my tasks").
   projectTitle?: string;
   onOpen: () => void;
@@ -306,12 +316,16 @@ export function TaskCard({
           >
             <CheckSquare className="size-2.5" />
           </span>
-          <span className="text-xs text-muted-foreground">
-            {new Date(createdAt).toLocaleDateString("pt-BR", {
-              day: "2-digit",
-              month: "short",
-            })}
-          </span>
+          {dueDate ? (
+            <DueBadge dueDate={dueDate} closed={closed} />
+          ) : (
+            <span className="text-xs text-muted-foreground">
+              {new Date(createdAt).toLocaleDateString("pt-BR", {
+                day: "2-digit",
+                month: "short",
+              })}
+            </span>
+          )}
         </span>
         {assigneeName ? <UserAvatar name={assigneeName} /> : <UnassignedAvatar />}
       </div>
