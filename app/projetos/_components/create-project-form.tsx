@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { ProjectPriority } from "@prisma/client";
 
 import { createProject } from "@/actions/projectActions";
+import { submitPublicRequest } from "@/actions/publicRequestActions";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -31,16 +32,29 @@ const schema = z.object({
   justification: z.string().min(10, "Informe a justificativa"),
   priority: z.nativeEnum(ProjectPriority),
   customFields: z.record(z.string().optional()).optional(),
+  // Public form only (guest mode).
+  guestName: z.string().optional(),
+  guestEmail: z.string().optional(),
+  guestDepartment: z.string().optional(),
+  website: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
 
 type CreateProjectFormProps = {
   fields?: ProjectRequestFieldConfig[];
+  // Public form: asks who the requester is and confirms by e-mail.
+  guest?: boolean;
+  allowedDomains?: string[];
 };
 
-export function CreateProjectForm({ fields }: CreateProjectFormProps) {
+export function CreateProjectForm({
+  fields,
+  guest = false,
+  allowedDomains = [],
+}: CreateProjectFormProps) {
   const [isPending, startTransition] = useTransition();
+  const [sentTo, setSentTo] = useState<string | null>(null);
   const { control, register, handleSubmit, reset, formState, setError } =
     useForm<FormValues>({
       resolver: zodResolver(schema),
@@ -50,6 +64,10 @@ export function CreateProjectForm({ fields }: CreateProjectFormProps) {
         justification: "",
         priority: ProjectPriority.MEDIUM,
         customFields: {},
+        guestName: "",
+        guestEmail: "",
+        guestDepartment: "",
+        website: "",
       },
     });
   const orderedFields = (fields?.length ? fields : PROJECT_REQUEST_FIELDS).sort(
@@ -90,12 +108,69 @@ export function CreateProjectForm({ fields }: CreateProjectFormProps) {
         isEmptyCustomValue(field, values.customFields?.[field.id]),
     );
 
+    let hasError = false;
+
+    if (guest) {
+      const name = values.guestName?.trim() ?? "";
+      const email = values.guestEmail?.trim().toLowerCase() ?? "";
+      const department = values.guestDepartment?.trim() ?? "";
+
+      if (name.length < 3) {
+        setError("guestName", { message: "Informe seu nome" });
+        hasError = true;
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        setError("guestEmail", { message: "Informe um e-mail valido" });
+        hasError = true;
+      } else if (
+        allowedDomains.length &&
+        !allowedDomains.includes(email.split("@")[1])
+      ) {
+        setError("guestEmail", {
+          message: `Use seu e-mail institucional (${allowedDomains
+            .map((domain) => `@${domain}`)
+            .join(", ")})`,
+        });
+        hasError = true;
+      }
+      if (department.length < 2) {
+        setError("guestDepartment", { message: "Informe seu setor" });
+        hasError = true;
+      }
+    }
+
     if (missingCustom.length) {
       missingCustom.forEach((field) => {
         setError(`customFields.${field.id}` as const, {
           type: "required",
           message: "Campo obrigatorio",
         });
+      });
+      hasError = true;
+    }
+
+    if (hasError) return;
+
+    if (guest) {
+      startTransition(async () => {
+        const result = await submitPublicRequest({
+          name: values.guestName ?? "",
+          email: values.guestEmail ?? "",
+          department: values.guestDepartment ?? "",
+          title: values.title,
+          description: values.description,
+          justification: values.justification,
+          customFields: values.customFields,
+          website: values.website,
+        });
+
+        if (!result.success) {
+          toast.error(result.error);
+          return;
+        }
+
+        setSentTo(result.data.email);
+        reset();
       });
       return;
     }
@@ -112,8 +187,91 @@ export function CreateProjectForm({ fields }: CreateProjectFormProps) {
     });
   });
 
+  if (sentTo) {
+    return (
+      <div className="grid gap-3 text-sm" role="status">
+        <p className="text-base font-semibold">Confirme seu e-mail</p>
+        <p>
+          Enviamos uma mensagem para <strong>{sentTo}</strong>. Abra o link
+          recebido para confirmar e registrar sua solicitação na fila. O link
+          vale por 24 horas.
+        </p>
+        <p className="text-muted-foreground">
+          Não recebeu? Verifique a caixa de spam ou envie o formulário
+          novamente.
+        </p>
+        <Button type="button" variant="outline" onClick={() => setSentTo(null)}>
+          Enviar outra solicitação
+        </Button>
+      </div>
+    );
+  }
+
   return (
-    <Form onSubmit={onSubmit} className="grid gap-4">
+    <Form onSubmit={onSubmit} className="relative grid gap-4">
+      {guest ? (
+        <>
+          <div className="grid gap-2">
+            <Label htmlFor="guestName">Nome</Label>
+            <Input
+              id="guestName"
+              placeholder="Seu nome completo"
+              autoComplete="name"
+              {...register("guestName")}
+            />
+            {formState.errors.guestName ? (
+              <span className="text-xs text-destructive">
+                {formState.errors.guestName.message}
+              </span>
+            ) : null}
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="guestEmail">E-mail institucional</Label>
+            <Input
+              id="guestEmail"
+              type="email"
+              placeholder={
+                allowedDomains.length
+                  ? `nome@${allowedDomains[0]}`
+                  : "nome@dominio.gov.br"
+              }
+              autoComplete="email"
+              {...register("guestEmail")}
+            />
+            {formState.errors.guestEmail ? (
+              <span className="text-xs text-destructive">
+                {formState.errors.guestEmail.message}
+              </span>
+            ) : null}
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="guestDepartment">Setor / unidade</Label>
+            <Input
+              id="guestDepartment"
+              placeholder="Onde você trabalha"
+              autoComplete="organization"
+              {...register("guestDepartment")}
+            />
+            {formState.errors.guestDepartment ? (
+              <span className="text-xs text-destructive">
+                {formState.errors.guestDepartment.message}
+              </span>
+            ) : null}
+          </div>
+          <div
+            aria-hidden="true"
+            className="absolute -left-[9999px] h-0 w-0 overflow-hidden"
+          >
+            <label htmlFor="website">Não preencha este campo</label>
+            <input
+              id="website"
+              tabIndex={-1}
+              autoComplete="off"
+              {...register("website")}
+            />
+          </div>
+        </>
+      ) : null}
       {orderedFields.map((field) => {
         if (field.key === "priority") {
           return null;
@@ -287,7 +445,11 @@ export function CreateProjectForm({ fields }: CreateProjectFormProps) {
         );
       })}
       <Button type="submit" disabled={isPending}>
-        {isPending ? "Enviando" : "Criar solicitação"}
+        {isPending
+          ? "Enviando"
+          : guest
+            ? "Enviar solicitação"
+            : "Criar solicitação"}
       </Button>
     </Form>
   );

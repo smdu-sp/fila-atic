@@ -77,6 +77,7 @@ export async function listUsers(): Promise<
   }
 
   const users = await prisma.user.findMany({
+    where: { isGuest: false },
     select: {
       id: true,
       name: true,
@@ -195,6 +196,20 @@ export async function createUser(
   }
 
   const exists = await prisma.user.findUnique({ where: { email } });
+
+  // Someone who used the public form is a guest user; registering their
+  // e-mail turns it into a regular account and keeps their requests.
+  if (exists?.isGuest) {
+    await prisma.user.update({
+      where: { id: exists.id },
+      data: { isGuest: false, isActive: true, role: input.role },
+    });
+
+    revalidatePath("/usuarios");
+
+    return { success: true, data: undefined };
+  }
+
   if (exists) {
     return { success: false, error: "Email ja cadastrado" };
   }

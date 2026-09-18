@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import type { NextAuthOptions } from "next-auth";
 import { getServerSession } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
@@ -54,7 +55,9 @@ export const authOptions: NextAuthOptions = {
             },
           });
 
-          if (!existingUser) {
+          // Guests (public request form) have no account until a coordinator
+          // registers their e-mail.
+          if (!existingUser || existingUser.isGuest) {
             throw new Error(
               "Usuário não cadastrado no sistema, entre em contato com o suporte.",
             );
@@ -111,7 +114,7 @@ export const authOptions: NextAuthOptions = {
             where: { email },
           });
 
-          if (!existingUser) {
+          if (!existingUser || existingUser.isGuest) {
             throw new Error(
               "Usuário não cadastrado no sistema, entre em contato com o suporte.",
             );
@@ -201,6 +204,15 @@ export async function getServerAuthSession() {
   return getServerSession(authOptions);
 }
 
+// Server-side page guard: the sidebar only hides links, so pages meant for
+// specific roles must refuse everyone else themselves.
+export async function requireRole(allowed: Role[]) {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  if (!allowed.includes(user.role)) redirect("/");
+  return user;
+}
+
 export type CurrentUser = {
   id: string;
   role: Role;
@@ -216,10 +228,17 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { id: true, role: true, name: true, email: true, isActive: true },
+    select: {
+      id: true,
+      role: true,
+      name: true,
+      email: true,
+      isActive: true,
+      isGuest: true,
+    },
   });
 
-  if (!user || !user.isActive) return null;
+  if (!user || !user.isActive || user.isGuest) return null;
 
   return {
     id: user.id,

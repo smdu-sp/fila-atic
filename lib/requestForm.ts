@@ -80,3 +80,28 @@ export const PROJECT_REQUEST_FIELDS: ProjectRequestFieldConfig[] = [
     isActive: false,
   },
 ];
+
+export function parseMultiValue(value?: string): string[] {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function parseOptions(value?: string | null): string[] {
+  return (value ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+export function hasCustomValue(fieldType: string, value?: string) {
+  if (fieldType === "MULTI_SELECT") {
+    return parseMultiValue(value).length > 0;
+  }
+
+  return Boolean(value?.trim());
+}

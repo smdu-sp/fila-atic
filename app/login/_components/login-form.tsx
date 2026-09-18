@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { signIn } from "next-auth/react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
@@ -102,6 +103,12 @@ export function LoginForm() {
         <Button type="submit" className="w-full" disabled={isPending}>
           {isPending ? "Entrando..." : "Entrar"}
         </Button>
+        <p className="text-center text-sm text-muted-foreground">
+          Não tem acesso?{" "}
+          <Link href="/solicitar" className="underline">
+            Abra uma solicitação
+          </Link>
+        </p>
       </div>
     </Form>
   );

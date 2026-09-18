@@ -113,3 +113,33 @@ export async function deleteUploads(fileUrls: string[]) {
     }),
   );
 }
+
+// Streams a stored file with headers that stop the browser from interpreting
+// it as a page. Callers must have authorized the access already.
+export async function serveUpload(storedName: string, downloadName: string) {
+  const filePath = getStoredUploadPath(storedName);
+  if (!filePath) {
+    return new Response("Arquivo nao encontrado", { status: 404 });
+  }
+
+  let content: Buffer;
+  try {
+    content = await fs.readFile(filePath);
+  } catch {
+    return new Response("Arquivo nao encontrado", { status: 404 });
+  }
+
+  const { contentType, inline } = getUploadContentType(storedName);
+  const disposition = inline ? "inline" : "attachment";
+
+  return new Response(new Uint8Array(content), {
+    headers: {
+      "Content-Type": contentType,
+      "Content-Length": String(content.length),
+      "Content-Disposition": `${disposition}; filename*=UTF-8''${encodeURIComponent(downloadName)}`,
+      "X-Content-Type-Options": "nosniff",
+      "Content-Security-Policy": "default-src 'none'; sandbox",
+      "Cache-Control": "private, no-cache",
+    },
+  });
+}

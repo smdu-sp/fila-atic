@@ -5,8 +5,10 @@ import { revalidatePath } from "next/cache";
 
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { notifyGuestRequester } from "@/lib/guestMail";
 import { getPriorityLabel, getStatusLabel } from "@/lib/projectLabels";
 import { createProjectLog } from "@/lib/projectLogs";
+import { hasCustomValue } from "@/lib/requestForm";
 import { deleteUploads } from "@/lib/uploads";
 
 type ActionResult<T> =
@@ -37,24 +39,6 @@ type AssignDeveloperInput = {
 
 function normalize(input: string) {
   return input.trim();
-}
-
-function parseMultiValue(value?: string) {
-  if (!value) return [];
-  try {
-    const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed.map(String) : [];
-  } catch {
-    return [];
-  }
-}
-
-function hasCustomValue(fieldType: string, value?: string) {
-  if (fieldType === "MULTI_SELECT") {
-    return parseMultiValue(value).length > 0;
-  }
-
-  return Boolean(value?.trim());
 }
 
 async function getUserOrError(): Promise<
@@ -223,6 +207,13 @@ export async function updateProject(
       },
     });
   });
+
+  if (input.status && input.status !== current.status) {
+    await notifyGuestRequester(
+      input.id,
+      `O status da sua solicitacao foi atualizado para "${getStatusLabel(input.status)}".`,
+    );
+  }
 
   revalidatePath("/fila");
   revalidatePath("/projetos");

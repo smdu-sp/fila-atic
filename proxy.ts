@@ -19,5 +19,10 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/auth|login).*)"],
+  // Reachable without a session: login, the public request form
+  // (/solicitar), guest tracking links (/acompanhar/<token>) and public
+  // images (favicon, login artwork).
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|api/auth|login|solicitar(?:/|$)|acompanhar(?:/|$)|.*\\.(?:png|jpe?g|svg|webp|ico)$).*)",
+  ],
 };

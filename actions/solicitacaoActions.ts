@@ -5,6 +5,7 @@ import { ProjectPriority, ProjectStatus, Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { canAccessProject } from "@/lib/projectAccess";
+import { notifyGuestRequester } from "@/lib/guestMail";
 import { getStatusLabel } from "@/lib/projectLabels";
 import { saveUploads, validateUploads } from "@/lib/uploads";
 
@@ -281,6 +282,11 @@ export async function createProjectMessage(
         : data,
   });
 
+  await notifyGuestRequester(
+    projectId,
+    "Ha uma nova mensagem da equipe na sua solicitacao.",
+  );
+
   return { success: true, data: undefined };
 }
 
@@ -332,6 +338,13 @@ export async function updateProjectStatusRestricted(
       },
     });
   });
+
+  if (status !== current.status) {
+    await notifyGuestRequester(
+      projectId,
+      `O status da sua solicitacao foi atualizado para "${getStatusLabel(status)}".`,
+    );
+  }
 
   return { success: true, data: undefined };
 }
