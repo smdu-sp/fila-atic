@@ -7,6 +7,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -66,7 +67,7 @@ export function OpenTasksDialog({
             </li>
           ) : null}
         </ul>
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <DialogFooter>
           <Button variant="ghost" onClick={onClose} disabled={busy}>
             Voltar
           </Button>
@@ -80,7 +81,7 @@ export function OpenTasksDialog({
               {action.label}
             </Button>
           ))}
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

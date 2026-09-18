@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogDescription,
   DialogHeader,
   DialogTitle,
@@ -102,7 +103,7 @@ export function MessageForm({
           <DialogTitle>{dialogTitle}</DialogTitle>
           <DialogDescription>{dialogDescription}</DialogDescription>
         </DialogHeader>
-        <div className="grid gap-3">
+        <div className="grid gap-4">
           <Textarea
             placeholder="Digite sua mensagem"
             value={message}
@@ -138,9 +139,11 @@ export function MessageForm({
               </div>
             ) : null}
           </div>
-          <Button onClick={handleSubmit} disabled={!canSend || isPending}>
-            {isPending ? "Enviando" : "Enviar mensagem"}
-          </Button>
+          <DialogFooter>
+            <Button onClick={handleSubmit} disabled={!canSend || isPending}>
+              {isPending ? "Enviando" : "Enviar mensagem"}
+            </Button>
+          </DialogFooter>
         </div>
       </DialogContent>
     </Dialog>

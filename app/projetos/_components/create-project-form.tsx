@@ -444,7 +444,11 @@ export function CreateProjectForm({
           </div>
         );
       })}
-      <Button type="submit" disabled={isPending}>
+      <Button
+        type="submit"
+        disabled={isPending}
+        className={guest ? "w-full" : "w-full sm:w-auto sm:justify-self-end"}
+      >
         {isPending
           ? "Enviando"
           : guest

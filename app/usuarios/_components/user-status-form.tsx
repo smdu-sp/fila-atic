@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { updateUserStatus } from "@/actions/userActions";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -52,13 +53,15 @@ export function UserStatusForm({ userId, defaultStatus }: UserStatusFormProps) {
   });
 
   return (
-    <Form onSubmit={onSubmit} className="flex flex-wrap gap-2">
+    <Form onSubmit={onSubmit} className="grid gap-1.5">
+      <Label htmlFor={`status-${userId}`}>Situação do acesso</Label>
+      <div className="flex items-center gap-2">
       <Controller
         control={control}
         name="isActive"
         render={({ field }) => (
           <Select value={field.value} onValueChange={field.onChange}>
-            <SelectTrigger className="w-[130px]" size="sm">
+            <SelectTrigger id={`status-${userId}`} className="flex-1">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -68,9 +71,10 @@ export function UserStatusForm({ userId, defaultStatus }: UserStatusFormProps) {
           </Select>
         )}
       />
-      <Button size="sm" type="submit" disabled={isPending}>
+      <Button type="submit" disabled={isPending}>
         {isPending ? "Salvando" : "Salvar"}
       </Button>
+      </div>
     </Form>
   );
 }

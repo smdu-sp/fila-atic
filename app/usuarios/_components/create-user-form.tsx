@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 
 import { createUser } from "@/actions/userActions";
 import { Button } from "@/components/ui/button";
+import { DialogFooter } from "@/components/ui/dialog";
 import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import {
@@ -106,9 +107,11 @@ export function CreateUserForm({ onCreated }: CreateUserFormProps) {
           <FieldError errors={[formState.errors.role]} />
         </FieldContent>
       </Field>
-      <Button type="submit" disabled={isPending}>
-        {isPending ? "Salvando" : "Cadastrar"}
-      </Button>
+      <DialogFooter>
+        <Button type="submit" disabled={isPending}>
+          {isPending ? "Salvando" : "Cadastrar"}
+        </Button>
+      </DialogFooter>
     </Form>
   );
 }

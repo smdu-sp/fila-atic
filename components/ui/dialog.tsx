@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Dialog as DialogPrimitive } from "radix-ui";
+import { XIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -39,21 +40,49 @@ function DialogOverlay({
   );
 }
 
+const contentSizes = {
+  sm: "sm:max-w-sm",
+  md: "sm:max-w-lg",
+  lg: "sm:max-w-2xl",
+  xl: "sm:max-w-4xl",
+} as const;
+
+// Children are laid out in a column with a fixed gap, so screens only put
+// header, body and footer inside and never need their own margins. Tall
+// content scrolls inside the dialog instead of running off the screen.
 function DialogContent({
   className,
+  children,
+  size = "md",
+  showCloseButton = true,
   ...props
-}: React.ComponentProps<typeof DialogPrimitive.Content>) {
+}: React.ComponentProps<typeof DialogPrimitive.Content> & {
+  size?: keyof typeof contentSizes;
+  showCloseButton?: boolean;
+}) {
   return (
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 start-1/2 z-50 w-full max-w-[95vw] -translate-x-1/2 rtl:translate-x-1/2 -translate-y-1/2 rounded-xl bg-background p-5 ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-lg data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          "fixed top-1/2 start-1/2 z-50 flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] -translate-x-1/2 rtl:translate-x-1/2 -translate-y-1/2 flex-col gap-5 overflow-y-auto rounded-xl bg-background p-6 shadow-xl ring-1 ring-foreground/10 duration-100 outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          contentSizes[size],
           className,
         )}
         {...props}
-      />
+      >
+        {children}
+        {showCloseButton ? (
+          <DialogPrimitive.Close
+            data-slot="dialog-close"
+            className="absolute end-4 top-4 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+          >
+            <XIcon className="size-4" />
+            <span className="sr-only">Fechar</span>
+          </DialogPrimitive.Close>
+        ) : null}
+      </DialogPrimitive.Content>
     </DialogPortal>
   );
 }
@@ -62,7 +91,7 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="dialog-header"
-      className={cn("grid gap-1.5", className)}
+      className={cn("grid gap-1.5 pe-8", className)}
       {...props}
     />
   );
@@ -72,7 +101,10 @@ function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="dialog-footer"
-      className={cn("mt-4 flex flex-wrap items-center gap-3", className)}
+      className={cn(
+        "flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end",
+        className,
+      )}
       {...props}
     />
   );
@@ -85,7 +117,7 @@ function DialogTitle({
   return (
     <DialogPrimitive.Title
       data-slot="dialog-title"
-      className={cn("text-base font-semibold", className)}
+      className={cn("text-lg font-semibold leading-tight", className)}
       {...props}
     />
   );
@@ -98,7 +130,10 @@ function DialogDescription({
   return (
     <DialogPrimitive.Description
       data-slot="dialog-description"
-      className={cn("text-sm text-muted-foreground", className)}
+      className={cn(
+        "text-sm leading-relaxed text-muted-foreground",
+        className,
+      )}
       {...props}
     />
   );

@@ -10,6 +10,7 @@ import { Role } from "@prisma/client";
 import { updateUserRole } from "@/actions/userActions";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -49,13 +50,15 @@ export function UserRoleForm({ userId, defaultRole }: UserRoleFormProps) {
   });
 
   return (
-    <Form onSubmit={onSubmit} className="flex flex-wrap gap-2">
+    <Form onSubmit={onSubmit} className="grid gap-1.5">
+      <Label htmlFor={`role-${userId}`}>Permissão de acesso</Label>
+      <div className="flex items-center gap-2">
       <Controller
         control={control}
         name="role"
         render={({ field }) => (
           <Select value={field.value} onValueChange={field.onChange}>
-            <SelectTrigger className="w-[160px]" size="sm">
+            <SelectTrigger id={`role-${userId}`} className="flex-1">
               <SelectValue placeholder="Role" />
             </SelectTrigger>
             <SelectContent>
@@ -68,9 +71,10 @@ export function UserRoleForm({ userId, defaultRole }: UserRoleFormProps) {
           </Select>
         )}
       />
-      <Button size="sm" type="submit" disabled={isPending}>
+      <Button type="submit" disabled={isPending}>
         {isPending ? "Salvando" : "Salvar"}
       </Button>
+      </div>
     </Form>
   );
 }
