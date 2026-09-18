@@ -39,6 +39,15 @@ enum TaskStatus {
   DEPLOYED
 }
 
+enum RequestFieldType {
+  TEXT
+  LONG_TEXT
+  SELECT
+  MULTI_SELECT
+  RADIO
+  DATE
+}
+
 model User {
   id                String             @id @default(uuid())
   login             String             @unique
@@ -67,6 +76,7 @@ model Project {
   developers    ProjectDeveloper[]
   tasks         Task[]
   logs          ProjectLog[]
+  requestValues ProjectRequestFieldValue[]
 }
 
 model ProjectDeveloper {
@@ -91,6 +101,14 @@ model Task {
   updatedAt   DateTime   @updatedAt
 }
 
+model TaskStatusLabel {
+  id        String     @id @default(uuid())
+  status    TaskStatus @unique
+  label     String
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
 model ProjectLog {
   id         String   @id @default(uuid())
   message    String   @db.Text
@@ -99,4 +117,43 @@ model ProjectLog {
   isInternal Boolean  @default(false)
   project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   createdAt  DateTime @default(now())
+  attachments ProjectLogAttachment[]
+}
+
+model ProjectLogAttachment {
+  id        String   @id @default(uuid())
+  logId     String
+  fileName  String
+  fileUrl   String
+  fileType  String?
+  fileSize  Int
+  createdAt DateTime @default(now())
+  log       ProjectLog @relation(fields: [logId], references: [id], onDelete: Cascade)
+}
+
+model ProjectRequestField {
+  id          String   @id @default(uuid())
+  key         String?  @unique
+  label       String
+  placeholder String
+  helperText  String?  @db.Text
+  order       Int
+  isSystem    Boolean  @default(false)
+  fieldType   RequestFieldType @default(TEXT)
+  options     String?  @db.Text
+  required    Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  values      ProjectRequestFieldValue[]
+}
+
+model ProjectRequestFieldValue {
+  id        String              @id @default(uuid())
+  projectId String
+  fieldId   String
+  value     String              @db.Text
+  createdAt DateTime            @default(now())
+  project   Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  field     ProjectRequestField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
 }
