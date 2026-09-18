@@ -7,7 +7,8 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { canAccessProject } from "@/lib/projectAccess";
 import { getTaskStatusLabel } from "@/lib/projectLabels";
-import { createProjectLog } from "@/lib/projectLogs";
+import { touchProject } from "@/lib/projectStatus";
+import { ensureTeamMember } from "@/lib/projectTeam";
 
 type ActionResult<T> =
   | { success: true; data: T }
@@ -47,13 +48,25 @@ async function getUserOrError(): Promise<
   };
 }
 
-async function isValidAssignee(assigneeId: string) {
+const isManager = (role: Role) =>
+  role === Role.COORDINATOR || role === Role.DEV_GLOBAL;
+
+// Handing a task to someone also puts them on the project team, so that is
+// reserved to managers. A restricted developer may only keep a task for
+// themselves or leave it without an owner.
+function mayAssign(auth: { id: string; role: Role }, assigneeId: string | null) {
+  return isManager(auth.role) || assigneeId === null || assigneeId === auth.id;
+}
+
+async function findAssignee(assigneeId: string) {
   const assignee = await prisma.user.findUnique({
     where: { id: assigneeId },
-    select: { role: true, isActive: true },
+    select: { name: true, role: true, isActive: true },
   });
 
-  return Boolean(assignee?.isActive && assignee.role !== Role.REQUESTER);
+  return assignee?.isActive && assignee.role !== Role.REQUESTER
+    ? assignee
+    : null;
 }
 
 export async function createTask(
@@ -70,6 +83,10 @@ export async function createTask(
     return { success: false, error: "Dados invalidos" };
   }
 
+  if (input.status && !Object.values(TaskStatus).includes(input.status)) {
+    return { success: false, error: "Status invalido" };
+  }
+
   const canAccess = await canAccessProject(
     auth.data.id,
     auth.data.role,
@@ -80,25 +97,42 @@ export async function createTask(
     return { success: false, error: "Sem permissao" };
   }
 
-  if (input.assigneeId && !(await isValidAssignee(input.assigneeId))) {
-    return { success: false, error: "Responsavel invalido" };
+  const assigneeId = input.assigneeId || null;
+  if (assigneeId) {
+    if (!mayAssign(auth.data, assigneeId)) {
+      return { success: false, error: "Sem permissao para atribuir" };
+    }
+    if (!(await findAssignee(assigneeId))) {
+      return { success: false, error: "Responsavel invalido" };
+    }
   }
 
-  const task = await prisma.task.create({
-    data: {
-      projectId: input.projectId,
-      title: normalize(input.title),
-      description: input.description?.trim() || null,
-      assigneeId: input.assigneeId ?? null,
-      status: input.status ?? TaskStatus.TODO,
-    },
-  });
+  const task = await prisma.$transaction(async (tx) => {
+    const created = await tx.task.create({
+      data: {
+        projectId: input.projectId,
+        title: normalize(input.title),
+        description: input.description?.trim() || null,
+        assigneeId,
+        status: input.status ?? TaskStatus.TODO,
+      },
+    });
 
-  await createProjectLog({
-    projectId: input.projectId,
-    message: `Tarefa "${task.title}" criada.`,
-    authorName: auth.data.name,
-    isInternal: true,
+    if (assigneeId) {
+      await ensureTeamMember(tx, input.projectId, assigneeId, auth.data.name);
+    }
+
+    await tx.projectLog.create({
+      data: {
+        projectId: input.projectId,
+        message: `Tarefa "${created.title}" criada.`,
+        authorName: auth.data.name,
+        isInternal: true,
+      },
+    });
+
+    await touchProject(tx, input.projectId);
+    return created;
   });
 
   revalidatePath("/kanban");
@@ -118,9 +152,20 @@ export async function updateTask(
     return { success: false, error: "Tarefa invalida" };
   }
 
+  if (input.status && !Object.values(TaskStatus).includes(input.status)) {
+    return { success: false, error: "Status invalido" };
+  }
+
   const task = await prisma.task.findUnique({
     where: { id: input.id },
-    select: { assigneeId: true, projectId: true, status: true, title: true },
+    select: {
+      assigneeId: true,
+      assignee: { select: { name: true } },
+      projectId: true,
+      status: true,
+      title: true,
+      description: true,
+    },
   });
 
   if (!task) {
@@ -137,16 +182,24 @@ export async function updateTask(
     return { success: false, error: "Sem permissao" };
   }
 
-  if (
-    auth.data.role !== Role.COORDINATOR &&
-    auth.data.role !== Role.DEV_GLOBAL &&
-    task.assigneeId !== auth.data.id
-  ) {
+  if (!isManager(auth.data.role) && task.assigneeId !== auth.data.id) {
     return { success: false, error: "Sem permissao" };
   }
 
-  if (input.assigneeId && !(await isValidAssignee(input.assigneeId))) {
-    return { success: false, error: "Responsavel invalido" };
+  // undefined leaves the assignee alone, null clears it.
+  let newAssignee: { name: string } | null | undefined;
+  if (input.assigneeId !== undefined && input.assigneeId !== task.assigneeId) {
+    if (!mayAssign(auth.data, input.assigneeId)) {
+      return { success: false, error: "Sem permissao para atribuir" };
+    }
+    if (input.assigneeId) {
+      newAssignee = await findAssignee(input.assigneeId);
+      if (!newAssignee) {
+        return { success: false, error: "Responsavel invalido" };
+      }
+    } else {
+      newAssignee = null;
+    }
   }
 
   const nextTitle = input.title ? normalize(input.title) : undefined;
@@ -156,26 +209,56 @@ export async function updateTask(
       ? undefined
       : input.description?.trim() || null;
   const nextStatus = input.status;
-  const nextAssigneeId = input.assigneeId;
 
-  await prisma.task.update({
-    where: { id: input.id },
-    data: {
-      title: nextTitle,
-      description: nextDescription,
-      status: nextStatus,
-      assigneeId: nextAssigneeId,
-    },
-  });
-
-  if (nextStatus && nextStatus !== task.status) {
-    await createProjectLog({
-      projectId: task.projectId,
-      message: `Tarefa "${task.title}" atualizada. Status: ${getTaskStatusLabel(task.status)} -> ${getTaskStatusLabel(nextStatus)}.`,
-      authorName: auth.data.name,
-      isInternal: true,
-    });
+  const changes: string[] = [];
+  if (nextTitle !== undefined && nextTitle !== task.title) {
+    changes.push(`Titulo: "${task.title}" -> "${nextTitle}"`);
   }
+  if (
+    nextDescription !== undefined &&
+    nextDescription !== (task.description ?? null)
+  ) {
+    changes.push("Descricao alterada");
+  }
+  if (nextStatus && nextStatus !== task.status) {
+    changes.push(
+      `Status: ${getTaskStatusLabel(task.status)} -> ${getTaskStatusLabel(nextStatus)}`,
+    );
+  }
+  if (newAssignee !== undefined) {
+    changes.push(
+      `Responsavel: ${task.assignee?.name ?? "sem responsavel"} -> ${newAssignee?.name ?? "sem responsavel"}`,
+    );
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.task.update({
+      where: { id: input.id },
+      data: {
+        title: nextTitle,
+        description: nextDescription,
+        status: nextStatus,
+        assigneeId: input.assigneeId,
+      },
+    });
+
+    if (newAssignee && input.assigneeId) {
+      await ensureTeamMember(tx, task.projectId, input.assigneeId, auth.data.name);
+    }
+
+    if (changes.length) {
+      await tx.projectLog.create({
+        data: {
+          projectId: task.projectId,
+          message: `Tarefa "${nextTitle ?? task.title}" atualizada. ${changes.join(" | ")}.`,
+          authorName: auth.data.name,
+          isInternal: true,
+        },
+      });
+    }
+
+    await touchProject(tx, task.projectId);
+  });
 
   revalidatePath("/kanban");
   revalidatePath("/projetos");
@@ -188,10 +271,7 @@ export async function deleteTask(taskId: string): Promise<ActionResult<void>> {
   const auth = await getUserOrError();
   if (!auth.success) return auth;
 
-  if (
-    auth.data.role !== Role.COORDINATOR &&
-    auth.data.role !== Role.DEV_GLOBAL
-  ) {
+  if (!isManager(auth.data.role)) {
     return { success: false, error: "Sem permissao" };
   }
 
@@ -208,13 +288,19 @@ export async function deleteTask(taskId: string): Promise<ActionResult<void>> {
     return { success: false, error: "Tarefa nao encontrada" };
   }
 
-  await prisma.task.delete({ where: { id: taskId } });
+  await prisma.$transaction(async (tx) => {
+    await tx.task.delete({ where: { id: taskId } });
 
-  await createProjectLog({
-    projectId: task.projectId,
-    message: `Tarefa "${task.title}" removida.`,
-    authorName: auth.data.name,
-    isInternal: true,
+    await tx.projectLog.create({
+      data: {
+        projectId: task.projectId,
+        message: `Tarefa "${task.title}" removida.`,
+        authorName: auth.data.name,
+        isInternal: true,
+      },
+    });
+
+    await touchProject(tx, task.projectId);
   });
 
   revalidatePath("/kanban");
@@ -273,6 +359,60 @@ export async function listTasksByProject(projectId: string): Promise<
     data: tasks.map(({ assignee, ...task }) => ({
       ...task,
       assigneeName: assignee?.name ?? null,
+    })),
+  };
+}
+
+// Every task assigned to the current user, across projects.
+export async function listMyTasks(): Promise<
+  ActionResult<
+    Array<{
+      id: string;
+      title: string;
+      description: string | null;
+      status: TaskStatus;
+      assigneeId: string | null;
+      assigneeName: string | null;
+      createdAt: Date;
+      projectId: string;
+      projectTitle: string;
+    }>
+  >
+> {
+  const auth = await getUserOrError();
+  if (!auth.success) return auth;
+
+  if (auth.data.role === Role.REQUESTER) {
+    return { success: false, error: "Sem permissao" };
+  }
+
+  const tasks = await prisma.task.findMany({
+    where: {
+      assigneeId: auth.data.id,
+      // a restricted developer only works on projects they belong to
+      ...(auth.data.role === Role.DEV_RESTRICTED
+        ? { project: { developers: { some: { userId: auth.data.id } } } }
+        : {}),
+    },
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      status: true,
+      assigneeId: true,
+      createdAt: true,
+      project: { select: { id: true, title: true } },
+    },
+    orderBy: { updatedAt: "desc" },
+  });
+
+  return {
+    success: true,
+    data: tasks.map(({ project, ...task }) => ({
+      ...task,
+      assigneeName: auth.data.name,
+      projectId: project.id,
+      projectTitle: project.title,
     })),
   };
 }

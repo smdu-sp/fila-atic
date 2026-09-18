@@ -27,6 +27,7 @@ import {
   type ProjectRequestFieldConfig,
 } from "@/lib/requestForm";
 import { loadRequestFields } from "@/lib/requestFormServer";
+import { recordStatusChange } from "@/lib/projectStatus";
 import { saveUploads, validateUploads } from "@/lib/uploads";
 
 // Everything here is callable without a session, so each action validates its
@@ -287,6 +288,13 @@ export async function confirmPublicRequest(
         requesterId: requester.id,
         trackingToken,
       },
+    });
+
+    await recordStatusChange(tx, {
+      projectId: project.id,
+      from: null,
+      to: project.status,
+      byName: pending.name,
     });
 
     const values = Object.entries(customValues).filter(([fieldId]) =>

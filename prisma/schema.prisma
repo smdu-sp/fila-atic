@@ -37,6 +37,7 @@ enum TaskStatus {
   PAUSED
   DONE
   DEPLOYED
+  CANCELED
 }
 
 enum RequestFieldType {
@@ -83,6 +84,22 @@ model Project {
   tasks         Task[]
   logs          ProjectLog[]
   requestValues ProjectRequestFieldValue[]
+  statusChanges ProjectStatusChange[]
+}
+
+// One row per status change, so reports can tell how long a project stayed in
+// each status. Rows written by the migration that introduced this table are a
+// baseline (current status, dated by the last update) and only approximate.
+model ProjectStatusChange {
+  id            String         @id @default(uuid())
+  projectId     String
+  fromStatus    ProjectStatus?
+  toStatus      ProjectStatus
+  changedByName String
+  createdAt     DateTime       @default(now())
+  project       Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, createdAt])
 }
 
 model ProjectDeveloper {

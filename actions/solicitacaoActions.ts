@@ -7,11 +7,18 @@ import { getCurrentUser } from "@/lib/auth";
 import { canAccessProject } from "@/lib/projectAccess";
 import { notifyGuestRequester } from "@/lib/guestMail";
 import { getStatusLabel } from "@/lib/projectLabels";
+import {
+  closeTasks,
+  planTaskDecision,
+  recordStatusChange,
+  type OpenTask,
+  type StatusChangeOptions,
+} from "@/lib/projectStatus";
 import { saveUploads, validateUploads } from "@/lib/uploads";
 
 type ActionResult<T> =
   | { success: true; data: T }
-  | { success: false; error: string };
+  | { success: false; error: string; openTasks?: OpenTask[] };
 
 type ProjectDetails = {
   id: string;
@@ -293,6 +300,7 @@ export async function createProjectMessage(
 export async function updateProjectStatusRestricted(
   projectId: string,
   status: ProjectStatus,
+  options: StatusChangeOptions = {},
 ): Promise<ActionResult<void>> {
   const auth = await getUserOrError();
   if (!auth.success) return auth;
@@ -323,11 +331,27 @@ export async function updateProjectStatusRestricted(
     return { success: false, error: "Chamado nao encontrado" };
   }
 
+  const changed = status !== current.status;
+  const decision = changed
+    ? await planTaskDecision(prisma, projectId, status, options)
+    : { ok: true as const, taskIdsToClose: [] };
+  if (!decision.ok) return decision.failure;
+
   await prisma.$transaction(async (tx) => {
     await tx.project.update({
       where: { id: projectId },
       data: { status },
     });
+
+    if (changed) {
+      await recordStatusChange(tx, {
+        projectId,
+        from: current.status,
+        to: status,
+        byName: auth.data.name,
+      });
+    }
+    await closeTasks(tx, projectId, decision.taskIdsToClose, auth.data.name);
 
     await tx.projectLog.create({
       data: {

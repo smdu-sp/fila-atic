@@ -33,6 +33,7 @@ export const taskStatusLabels: Record<TaskStatus, string> = {
   PAUSED: "Pausado",
   DONE: "Concluido",
   DEPLOYED: "Publicado",
+  CANCELED: "Cancelada",
 };
 
 export function getStatusLabel(status: ProjectStatus) {
