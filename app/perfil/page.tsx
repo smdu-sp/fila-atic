@@ -1,0 +1,132 @@
+import { redirect } from "next/navigation";
+
+import { AppSidebar } from "@/components/app-sidebar";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
+import { getServerAuthSession } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { getRoleLabel } from "@/lib/roles";
+
+export default async function PerfilPage() {
+  const session = await getServerAuthSession();
+
+  if (!session?.user?.id) {
+    redirect("/login");
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: {
+      login: true,
+      name: true,
+      email: true,
+      department: true,
+      role: true,
+      createdAt: true,
+      isActive: true,
+    },
+  });
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  return (
+    <div className="relative w-full overflow-x-hidden">
+      <SidebarProvider>
+        <AppSidebar />
+        <SidebarInset className="min-w-0">
+          <header className="hidden h-16 shrink-0 items-center gap-2 bg-muted/50 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12 sm:flex">
+            <div className="flex items-center gap-2 px-3 sm:px-4">
+              <SidebarTrigger className="-ml-1 md:hidden" />
+              <Separator
+                orientation="vertical"
+                className="mr-2 h-4 md:ml-[-16px]"
+              />
+              <div className="flex flex-col">
+                <span className="text-sm font-semibold">Perfil</span>
+              </div>
+            </div>
+          </header>
+          <div className="w-full min-w-0 bg-muted/50 p-4 pt-6 sm:gap-4 sm:p-6 sm:pt-4">
+            <div className="flex flex-col gap-1">
+              <h1 className="text-2xl font-semibold">Perfil do usuario</h1>
+              <p className="text-sm text-muted-foreground">
+                Informacoes sincronizadas do LDAP.
+              </p>
+            </div>
+
+            <div className="mt-6 grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Dados principais</CardTitle>
+                  <CardDescription>
+                    Nome, login e email utilizados para autenticacao.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-muted-foreground">Nome</span>
+                    <span className="font-medium">{user.name}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-muted-foreground">Login</span>
+                    <span className="font-medium">{user.login}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-muted-foreground">Email</span>
+                    <span className="font-medium">{user.email}</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Perfil institucional</CardTitle>
+                  <CardDescription>
+                    Informacoes de acesso e departamento.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-muted-foreground">Departamento</span>
+                    <span className="font-medium">{user.department}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-muted-foreground">Role</span>
+                    <span className="font-medium">
+                      {getRoleLabel(user.role)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-muted-foreground">Status</span>
+                    <span className="font-medium">
+                      {user.isActive ? "Ativo" : "Inativo"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-muted-foreground">Criado em</span>
+                    <span className="font-medium">
+                      {user.createdAt.toLocaleDateString("pt-BR")}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </SidebarInset>
+      </SidebarProvider>
+    </div>
+  );
+}

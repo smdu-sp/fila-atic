@@ -1,0 +1,112 @@
+import { listProjectLogs } from "@/actions/logActions";
+import { AppSidebar } from "@/components/app-sidebar";
+import { Separator } from "@/components/ui/separator";
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
+import { getServerAuthSession } from "@/lib/auth";
+import {
+  priorityLabels,
+  statusLabels,
+  taskStatusLabels,
+} from "@/lib/projectLabels";
+
+export default async function LogsPage() {
+  const result = await listProjectLogs();
+  const logs = result.success ? result.data : [];
+  const session = await getServerAuthSession();
+  const currentUserName = session?.user?.name ?? session?.user?.email ?? "";
+  const translateLogMessage = (message: string) => {
+    let resultMessage = message;
+    Object.entries(statusLabels).forEach(([key, label]) => {
+      resultMessage = resultMessage.replaceAll(key, label);
+    });
+    Object.entries(taskStatusLabels).forEach(([key, label]) => {
+      resultMessage = resultMessage.replaceAll(key, label);
+    });
+    Object.entries(priorityLabels).forEach(([key, label]) => {
+      resultMessage = resultMessage.replaceAll(key, label);
+    });
+    return resultMessage;
+  };
+  const getMessageContent = (message: string) =>
+    message.trim() ? message.trim() : "anexos";
+  const getMessageLabel = (authorName: string) =>
+    currentUserName && authorName === currentUserName
+      ? "Mensagem enviada"
+      : "Mensagem recebida";
+  const formatLogMessage = (log: (typeof logs)[number]) =>
+    log.isInternal
+      ? translateLogMessage(log.message)
+      : `${getMessageLabel(log.authorName)} [${getMessageContent(log.message)}]`;
+
+  return (
+    <div className="relative w-full overflow-x-hidden">
+      <SidebarProvider>
+        <AppSidebar />
+        <SidebarInset className="min-w-0">
+          <header className="hidden h-16 shrink-0 items-center gap-2 bg-muted/50 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12 sm:flex">
+            <div className="flex items-center gap-2 px-3 sm:px-4">
+              <SidebarTrigger className="-ml-1 md:hidden" />
+              <Separator
+                orientation="vertical"
+                className="mr-2 h-4 md:ml-[-16px]"
+              />
+              <div className="flex flex-col">
+                <span className="text-sm font-semibold">Logs</span>
+              </div>
+            </div>
+          </header>
+          <div className="w-full min-w-0 bg-muted/50 p-4 pt-6 sm:gap-4 sm:p-6 sm:pt-4">
+            <div className="flex flex-col gap-1">
+              <h1 className="text-2xl font-semibold">Logs</h1>
+              <p className="text-sm text-muted-foreground">
+                Historico de eventos e comunicacoes internas.
+              </p>
+            </div>
+
+            <div className="mt-6">
+              {!result.success ? (
+                <div className="text-sm text-destructive">{result.error}</div>
+              ) : null}
+              <div className="overflow-hidden rounded-lg border border-border/60 bg-background">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-primary text-primary-foreground">
+                      <tr className="text-left">
+                        <th className="px-4 py-3 font-semibold">Alteracao</th>
+                        <th className="px-4 py-3 font-semibold">Projeto</th>
+                        <th className="px-4 py-3 font-semibold">Autor</th>
+                        <th className="px-4 py-3 font-semibold">Data e hora</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {logs.map((log) => (
+                        <tr key={log.id} className="border-b last:border-b-0">
+                          <td className="px-4 py-3 font-medium text-foreground">
+                            {formatLogMessage(log)}
+                          </td>
+                          <td className="px-4 py-3 text-muted-foreground">
+                            {log.projectTitle}
+                          </td>
+                          <td className="px-4 py-3 text-muted-foreground">
+                            {log.authorName}
+                          </td>
+                          <td className="px-4 py-3 text-muted-foreground">
+                            {log.createdAt.toLocaleString("pt-BR")}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </SidebarInset>
+      </SidebarProvider>
+    </div>
+  );
+}
