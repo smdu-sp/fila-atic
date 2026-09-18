@@ -26,18 +26,24 @@ Usuários precisam ser cadastrados previamente (por e-mail) na tela de usuários
 # 1. banco de dados (Postgres em Docker)
 docker compose up -d
 
-# 2. dependências e client do Prisma
+# 2. variáveis de ambiente (veja .env.example)
+cp .env.example .env
+
+# 3. dependências e client do Prisma
 npm install
 npx prisma generate
 
-# 3. migrations
+# 4. migrations
 npx prisma migrate deploy
 
-# 4. servidor de desenvolvimento (http://localhost:3003)
+# 5. primeiro coordenador (idempotente)
+SEED_COORDINATOR_EMAIL=seu.email@dominio.gov.br npm run db:seed
+
+# 6. servidor de desenvolvimento (http://localhost:3003)
 npm run dev
 ```
 
-O projeto não tem seed: o primeiro coordenador precisa ser inserido direto na tabela `User` (por exemplo via `npx prisma studio`) com `role = COORDINATOR`.
+Sem o passo 5 não há quem cadastre os demais usuários. Se o e-mail já existir, a pessoa é apenas promovida a coordenador.
 
 ## Variáveis de ambiente (`.env`)
 
@@ -49,6 +55,8 @@ O projeto não tem seed: o primeiro coordenador precisa ser inserido direto na t
 | `LDAP_BASE_DN` (ou `LDAP_BASE`) | Base de busca de usuários |
 | `LDAP_BIND_DN` / `LDAP_BIND_PASSWORD` | Usuário de serviço (ou `USER_LDAP` + `LDAP_DOMAIN` / `PASS_LDAP`) |
 | `ENVIRONMENT` | `local` pula o LDAP e aceita qualquer senha não vazia |
+| `PUBLIC_REQUEST_ALLOWED_DOMAINS` | Domínios de e-mail (separados por vírgula) que podem abrir solicitações em `/solicitar` sem conta. Vazio desativa a função |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | Envio de e-mails (confirmação e avisos). Sem `SMTP_HOST`, fora de produção o e-mail é impresso no console |
 
 `ENVIRONMENT=local` só vale fora de builds de produção (`NODE_ENV !== "production"`); em produção o LDAP é sempre usado.
 
@@ -61,3 +69,5 @@ Os anexos das mensagens ficam em `storage/uploads/` (fora de `public/`, ignorado
 - `npm run dev`: desenvolvimento na porta 3003
 - `npm run build` / `npm start`: build e execução de produção
 - `npm run lint`: ESLint
+- `npm test`: testes automatizados (Vitest). Usam um banco próprio, `<nome>_test` no mesmo servidor, criado e migrado automaticamente. Nunca tocam no banco de desenvolvimento.
+- `npm run db:seed`: cria ou promove o primeiro coordenador (`SEED_COORDINATOR_EMAIL`)

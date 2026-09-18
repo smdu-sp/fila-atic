@@ -50,3 +50,6 @@ next-env.d.ts
 
 # uploaded attachments (served by app/uploads/[name]/route.ts)
 /storage
+
+# the example file documents the variables and holds no secrets
+!.env.example
