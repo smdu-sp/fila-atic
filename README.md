@@ -1,40 +1,63 @@
-<<<<<<< HEAD
-# fila-atic
-=======
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Fila ATIC
 
-## Getting Started
+Sistema interno de fila de chamados/projetos de TI. Solicitantes abrem pedidos, a coordenação faz a triagem e os desenvolvedores acompanham a execução em um Kanban de tarefas.
 
-First, run the development server:
+## Stack
+
+- Next.js 16 (App Router, server actions) e React 19
+- Prisma 7 + PostgreSQL (adapter `pg`)
+- NextAuth (JWT) com login via LDAP/Active Directory
+- Tailwind CSS 4, shadcn/ui e Base UI
+
+## Perfis
+
+| Perfil | Rótulo | Acesso |
+| --- | --- | --- |
+| `REQUESTER` | Solicitante | Abre chamados e acompanha os próprios |
+| `COORDINATOR` | Coordenador | Fila de entrada, usuários, formulário de solicitação, todos os projetos |
+| `DEV_GLOBAL` | DEV II | Todos os projetos, atribuição de desenvolvedores e tarefas |
+| `DEV_RESTRICTED` | DEV I | Apenas projetos em que foi atribuído |
+
+Usuários precisam ser cadastrados previamente (por e-mail) na tela de usuários. No primeiro login, nome e departamento vêm do LDAP.
+
+## Como rodar
 
 ```bash
+# 1. banco de dados (Postgres em Docker)
+docker compose up -d
+
+# 2. dependências e client do Prisma
+npm install
+npx prisma generate
+
+# 3. migrations
+npx prisma migrate deploy
+
+# 4. servidor de desenvolvimento (http://localhost:3003)
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+O projeto não tem seed: o primeiro coordenador precisa ser inserido direto na tabela `User` (por exemplo via `npx prisma studio`) com `role = COORDINATOR`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Variáveis de ambiente (`.env`)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Variável | Descrição |
+| --- | --- |
+| `DATABASE_URL` | Conexão do Postgres |
+| `NEXTAUTH_SECRET` / `NEXTAUTH_URL` | Configuração do NextAuth |
+| `LDAP_URL` (ou `LDAP_SERVER`) | Servidor LDAP |
+| `LDAP_BASE_DN` (ou `LDAP_BASE`) | Base de busca de usuários |
+| `LDAP_BIND_DN` / `LDAP_BIND_PASSWORD` | Usuário de serviço (ou `USER_LDAP` + `LDAP_DOMAIN` / `PASS_LDAP`) |
+| `ENVIRONMENT` | `local` pula o LDAP e aceita qualquer senha não vazia |
 
-## Learn More
+`ENVIRONMENT=local` só vale fora de builds de produção (`NODE_ENV !== "production"`); em produção o LDAP é sempre usado.
 
-To learn more about Next.js, take a look at the following resources:
+## Anexos
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Os anexos das mensagens ficam em `storage/uploads/` (fora de `public/`, ignorado pelo git) e são servidos por `/uploads/[name]`, que exige sessão e acesso ao chamado. Limites: 3 arquivos por mensagem, 10 MB cada, apenas tipos de documento e imagem (ver `lib/uploads.ts`). Em produção, faça backup desse diretório junto com o banco.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Scripts
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
->>>>>>> e1b63d3 (feat: initialize project with Next.js, Prisma, and Tailwind CSS)
+- `npm run dev`: desenvolvimento na porta 3003
+- `npm run build` / `npm start`: build e execução de produção
+- `npm run lint`: ESLint
