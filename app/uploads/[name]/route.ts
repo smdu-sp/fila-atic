@@ -16,23 +16,39 @@ export async function GET(
     return new Response("Nao autenticado", { status: 401 });
   }
 
-  const attachment = await prisma.projectLogAttachment.findFirst({
-    where: { fileUrl: `${UPLOAD_URL_PREFIX}${name}` },
+  const fileUrl = `${UPLOAD_URL_PREFIX}${name}`;
+  // Same answer for "missing" and "forbidden" so names are not probeable.
+  const notFound = () => new Response("Arquivo nao encontrado", { status: 404 });
+
+  // A file of a conversation message...
+  const message = await prisma.projectLogAttachment.findFirst({
+    where: { fileUrl },
     select: {
       fileName: true,
       log: { select: { projectId: true, isInternal: true } },
     },
   });
 
-  // Same response for "missing" and "forbidden" so ids are not probeable.
-  const allowed =
-    attachment &&
-    !(attachment.log.isInternal && user.role === Role.REQUESTER) &&
-    (await canAccessProject(user.id, user.role, attachment.log.projectId));
-
-  if (!attachment || !allowed) {
-    return new Response("Arquivo nao encontrado", { status: 404 });
+  if (message) {
+    const allowed =
+      !(message.log.isInternal && user.role === Role.REQUESTER) &&
+      (await canAccessProject(user.id, user.role, message.log.projectId));
+    return allowed ? serveUpload(name, message.fileName) : notFound();
   }
 
-  return serveUpload(name, attachment.fileName);
+  // ...or of a task (internal work: never for requesters).
+  const task = await prisma.taskAttachment.findFirst({
+    where: { fileUrl },
+    select: { fileName: true, task: { select: { projectId: true } } },
+  });
+
+  if (
+    task &&
+    user.role !== Role.REQUESTER &&
+    (await canAccessProject(user.id, user.role, task.task.projectId))
+  ) {
+    return serveUpload(name, task.fileName);
+  }
+
+  return notFound();
 }

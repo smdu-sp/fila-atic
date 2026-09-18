@@ -1,4 +1,9 @@
-import { ProjectPriority, ProjectStatus, TaskStatus } from "@prisma/client";
+import {
+  ProjectCategory,
+  ProjectPriority,
+  ProjectStatus,
+  TaskStatus,
+} from "@prisma/client";
 
 export const statusLabels: Record<ProjectStatus, string> = {
   IN_QUEUE: "Na fila",
@@ -35,6 +40,18 @@ export const taskStatusLabels: Record<TaskStatus, string> = {
   DEPLOYED: "Publicado",
   CANCELED: "Cancelada",
 };
+
+export const categoryLabels: Record<ProjectCategory, string> = {
+  BUG: "Erro / correção",
+  IMPROVEMENT: "Melhoria",
+  NEW_SYSTEM: "Sistema novo",
+  SUPPORT: "Suporte / dúvida",
+  OTHER: "Outro",
+};
+
+export function getCategoryLabel(category: ProjectCategory) {
+  return categoryLabels[category] ?? category;
+}
 
 export function getStatusLabel(status: ProjectStatus) {
   return statusLabels[status] ?? status;

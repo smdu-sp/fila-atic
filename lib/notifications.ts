@@ -15,7 +15,8 @@ export type NotificationKind =
   | "MESSAGE"
   | "STATUS_CHANGED"
   | "DUE_CHANGED"
-  | "DEADLINE";
+  | "DEADLINE"
+  | "TASK_COMMENT";
 
 type NotifyInput = {
   userIds: string[];

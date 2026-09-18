@@ -2,6 +2,7 @@
 
 import { isCoordination, isManagerRole } from "@/lib/roles";
 import {
+  ProjectCategory,
   ProjectPriority,
   ProjectStatus,
   Role,
@@ -12,7 +13,11 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { notifyGuestRequester } from "@/lib/guestMail";
-import { getPriorityLabel, getStatusLabel } from "@/lib/projectLabels";
+import {
+  getCategoryLabel,
+  getPriorityLabel,
+  getStatusLabel,
+} from "@/lib/projectLabels";
 import { createProjectLog } from "@/lib/projectLogs";
 import {
   notifyNewRequest,
@@ -66,6 +71,8 @@ type UpdateProjectInput = {
   status?: ProjectStatus;
   // "YYYY-MM-DD" sets the delivery forecast, null clears it, undefined leaves it.
   dueDate?: string | null;
+  // Kind of demand; null clears it, undefined leaves it.
+  category?: ProjectCategory | null;
 } & StatusChangeOptions;
 
 type AssignDeveloperInput = {
@@ -228,9 +235,22 @@ export async function updateProject(
     return { success: false, error: "Data de previsao invalida" };
   }
 
+  if (
+    input.category &&
+    !Object.values(ProjectCategory).includes(input.category)
+  ) {
+    return { success: false, error: "Categoria invalida" };
+  }
+
   const current = await prisma.project.findUnique({
     where: { id: input.id },
-    select: { title: true, status: true, priority: true, dueDate: true },
+    select: {
+      title: true,
+      status: true,
+      priority: true,
+      dueDate: true,
+      category: true,
+    },
   });
 
   if (!current) {
@@ -256,6 +276,14 @@ export async function updateProject(
     const label = (date: Date | null) =>
       date ? formatDueDate(date) : "sem previsao";
     updates.push(`Previsao: ${label(current.dueDate)} -> ${label(due.value)}`);
+  }
+
+  if (input.category !== undefined && input.category !== current.category) {
+    const label = (category: ProjectCategory | null) =>
+      category ? getCategoryLabel(category) : "sem categoria";
+    updates.push(
+      `Categoria: ${label(current.category)} -> ${label(input.category)}`,
+    );
   }
 
   const newStatus =
@@ -297,6 +325,7 @@ export async function updateProject(
         status: input.status,
         dueDate: due.value,
         closeReason,
+        category: input.category,
       },
     });
 
@@ -390,6 +419,7 @@ export async function deleteProject(
     select: {
       title: true,
       logs: { select: { attachments: { select: { fileUrl: true } } } },
+      tasks: { select: { attachments: { select: { fileUrl: true } } } },
     },
   });
 
@@ -401,11 +431,14 @@ export async function deleteProject(
   // projectId would violate the FK and roll the delete back).
   await prisma.project.delete({ where: { id: projectId } });
 
-  await deleteUploads(
-    current.logs.flatMap((log) =>
+  await deleteUploads([
+    ...current.logs.flatMap((log) =>
       log.attachments.map((attachment) => attachment.fileUrl),
     ),
-  );
+    ...current.tasks.flatMap((task) =>
+      task.attachments.map((attachment) => attachment.fileUrl),
+    ),
+  ]);
 
   revalidatePath("/fila");
   revalidatePath("/projetos");
@@ -426,6 +459,7 @@ export type ProjectListItem = {
   createdAt: Date;
   updatedAt: Date;
   dueDate: Date | null;
+  category: ProjectCategory | null;
   // Cancelled tasks are left out of both numbers.
   taskTotal: number;
   taskDone: number;
@@ -442,6 +476,7 @@ const projectListSelect = {
   createdAt: true,
   updatedAt: true,
   dueDate: true,
+  category: true,
   developers: { select: { userId: true } },
 } satisfies Prisma.ProjectSelect;
 
@@ -489,6 +524,7 @@ async function toListItems(
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
     dueDate: item.dueDate,
+    category: item.category,
     taskTotal: progress.get(item.id)?.total ?? 0,
     taskDone: progress.get(item.id)?.done ?? 0,
     // requesters do not need to know who is on the team
@@ -519,6 +555,7 @@ export type ProjectSearch = {
   status?: ProjectStatus;
   priority?: ProjectPriority;
   developerId?: string;
+  category?: ProjectCategory;
   overdue?: boolean;
   sort?: "recent" | "due" | "updated";
   page?: number;
@@ -553,6 +590,12 @@ export async function searchProjects(
   }
   if (params.developerId) {
     filters.push({ developers: { some: { userId: params.developerId } } });
+  }
+  if (
+    params.category &&
+    Object.values(ProjectCategory).includes(params.category)
+  ) {
+    filters.push({ category: params.category });
   }
   if (params.overdue) {
     filters.push({

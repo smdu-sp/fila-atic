@@ -2,6 +2,7 @@
 
 import { isCoordination } from "@/lib/roles";
 import {
+  ProjectCategory,
   ProjectPriority,
   ProjectStatus,
   Role,
@@ -89,11 +90,13 @@ export type QueueItem = {
   requesterDepartment: string;
   status: ProjectStatus;
   dueDate: Date | null;
+  category: ProjectCategory | null;
 };
 
 export type QueueSearch = {
   q?: string;
   priority?: ProjectPriority;
+  category?: ProjectCategory;
   // oldest first is the default: the longest wait is the most urgent to look at
   sort?: "oldest" | "newest" | "priority";
   page?: number;
@@ -129,6 +132,12 @@ export async function searchQueue(
   ) {
     filters.push({ priority: params.priority });
   }
+  if (
+    params.category &&
+    Object.values(ProjectCategory).includes(params.category)
+  ) {
+    filters.push({ category: params.category });
+  }
 
   const orderBy: Prisma.ProjectOrderByWithRelationInput[] =
     params.sort === "newest"
@@ -152,6 +161,7 @@ export async function searchQueue(
       createdAt: true,
       status: true,
       dueDate: true,
+      category: true,
       requester: { select: { name: true, department: true } },
     },
     orderBy,
@@ -169,6 +179,7 @@ export async function searchQueue(
         createdAt: row.createdAt,
         status: row.status,
         dueDate: row.dueDate,
+        category: row.category,
         requesterName: row.requester.name,
         requesterDepartment: row.requester.department,
       })),

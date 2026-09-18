@@ -1,14 +1,16 @@
 "use server";
 
 import { isManagerRole } from "@/lib/roles";
-import { Role, TaskStatus } from "@prisma/client";
+import { ProjectPriority, Role, TaskStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { canAccessProject } from "@/lib/projectAccess";
 import { formatDueDate, parseDateInput, toDateInput } from "@/lib/dueDate";
-import { getTaskStatusLabel } from "@/lib/projectLabels";
+import { getPriorityLabel, getTaskStatusLabel } from "@/lib/projectLabels";
+import { LABELS_ERROR, normalizeLabels } from "@/lib/taskFields";
+import { deleteUploads } from "@/lib/uploads";
 import { touchProject } from "@/lib/projectStatus";
 import { notifyTaskAssigned } from "@/lib/notifications";
 import { ensureTeamMember } from "@/lib/projectTeam";
@@ -25,6 +27,8 @@ type CreateTaskInput = {
   status?: TaskStatus;
   // "YYYY-MM-DD"; null or empty means no due date.
   dueDate?: string | null;
+  priority?: ProjectPriority;
+  labels?: string[];
 };
 
 type UpdateTaskInput = {
@@ -35,6 +39,8 @@ type UpdateTaskInput = {
   assigneeId?: string | null;
   // "YYYY-MM-DD" sets it, null clears it, undefined leaves it.
   dueDate?: string | null;
+  priority?: ProjectPriority;
+  labels?: string[];
 };
 
 function normalize(input: string) {
@@ -127,6 +133,17 @@ export async function createTask(
     return { success: false, error: "Prazo invalido" };
   }
 
+  const priority = input.priority ?? ProjectPriority.MEDIUM;
+  if (!Object.values(ProjectPriority).includes(priority)) {
+    return { success: false, error: "Prioridade invalida" };
+  }
+
+  const labels: ReturnType<typeof normalizeLabels> =
+    input.labels === undefined
+      ? { ok: true, value: [] }
+      : normalizeLabels(input.labels);
+  if (!labels.ok) return { success: false, error: LABELS_ERROR };
+
   const assigneeId = input.assigneeId || null;
   if (assigneeId) {
     if (!mayAssign(auth.data, assigneeId)) {
@@ -146,6 +163,10 @@ export async function createTask(
         assigneeId,
         status: input.status ?? TaskStatus.TODO,
         dueDate: due.value ?? null,
+        priority,
+        labels: labels.value,
+        // minus the time: ascending order puts new tasks on top of the column
+        position: -(Date.now() / 1000),
       },
     });
 
@@ -201,6 +222,8 @@ export async function updateTask(
       title: true,
       description: true,
       dueDate: true,
+      priority: true,
+      labels: true,
     },
   });
 
@@ -212,6 +235,19 @@ export async function updateTask(
   if (!due.ok) {
     return { success: false, error: "Prazo invalido" };
   }
+
+  if (
+    input.priority !== undefined &&
+    !Object.values(ProjectPriority).includes(input.priority)
+  ) {
+    return { success: false, error: "Prioridade invalida" };
+  }
+
+  // undefined leaves the labels alone
+  const labels =
+    input.labels === undefined ? undefined : normalizeLabels(input.labels);
+  if (labels && !labels.ok) return { success: false, error: LABELS_ERROR };
+  const nextLabels = labels?.ok ? labels.value : undefined;
 
   const canAccess = await canAccessProject(
     auth.data.id,
@@ -274,6 +310,16 @@ export async function updateTask(
       date ? formatDueDate(date) : "sem prazo";
     changes.push(`Prazo: ${label(task.dueDate)} -> ${label(due.value)}`);
   }
+  if (input.priority !== undefined && input.priority !== task.priority) {
+    changes.push(
+      `Prioridade: ${getPriorityLabel(task.priority)} -> ${getPriorityLabel(input.priority)}`,
+    );
+  }
+  if (nextLabels && nextLabels.join("\n") !== task.labels.join("\n")) {
+    changes.push(
+      `Etiquetas: ${task.labels.join(", ") || "nenhuma"} -> ${nextLabels.join(", ") || "nenhuma"}`,
+    );
+  }
   if (newAssignee !== undefined) {
     changes.push(
       `Responsavel: ${task.assignee?.name ?? "sem responsavel"} -> ${newAssignee?.name ?? "sem responsavel"}`,
@@ -289,6 +335,8 @@ export async function updateTask(
         status: nextStatus,
         assigneeId: input.assigneeId,
         dueDate: due.value,
+        priority: input.priority,
+        labels: nextLabels,
       },
     });
 
@@ -347,6 +395,11 @@ export async function deleteTask(taskId: string): Promise<ActionResult<void>> {
     return { success: false, error: "Tarefa nao encontrada" };
   }
 
+  const files = await prisma.taskAttachment.findMany({
+    where: { taskId },
+    select: { fileUrl: true },
+  });
+
   await prisma.$transaction(async (tx) => {
     await tx.task.delete({ where: { id: taskId } });
 
@@ -361,6 +414,8 @@ export async function deleteTask(taskId: string): Promise<ActionResult<void>> {
 
     await touchProject(tx, task.projectId);
   });
+
+  await deleteUploads(files.map((file) => file.fileUrl));
 
   revalidatePath("/kanban");
   revalidatePath("/projetos");
@@ -379,6 +434,11 @@ export async function listTasksByProject(projectId: string): Promise<
       assigneeId: string | null;
       assigneeName: string | null;
       dueDate: Date | null;
+      priority: ProjectPriority;
+      labels: string[];
+      position: number;
+      commentCount: number;
+      attachmentCount: number;
       createdAt: Date;
     }>
   >
@@ -410,16 +470,22 @@ export async function listTasksByProject(projectId: string): Promise<
       assigneeId: true,
       assignee: { select: { name: true } },
       dueDate: true,
+      priority: true,
+      labels: true,
+      position: true,
+      _count: { select: { comments: true, attachments: true } },
       createdAt: true,
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ position: "asc" }, { createdAt: "desc" }],
   });
 
   return {
     success: true,
-    data: tasks.map(({ assignee, ...task }) => ({
+    data: tasks.map(({ assignee, _count, ...task }) => ({
       ...task,
       assigneeName: assignee?.name ?? null,
+      commentCount: _count.comments,
+      attachmentCount: _count.attachments,
     })),
   };
 }
@@ -435,6 +501,11 @@ export async function listMyTasks(): Promise<
       assigneeId: string | null;
       assigneeName: string | null;
       dueDate: Date | null;
+      priority: ProjectPriority;
+      labels: string[];
+      position: number;
+      commentCount: number;
+      attachmentCount: number;
       createdAt: Date;
       projectId: string;
       projectTitle: string;
@@ -463,6 +534,10 @@ export async function listMyTasks(): Promise<
       status: true,
       assigneeId: true,
       dueDate: true,
+      priority: true,
+      labels: true,
+      position: true,
+      _count: { select: { comments: true, attachments: true } },
       createdAt: true,
       project: { select: { id: true, title: true } },
     },
@@ -471,11 +546,124 @@ export async function listMyTasks(): Promise<
 
   return {
     success: true,
-    data: tasks.map(({ project, ...task }) => ({
+    data: tasks.map(({ project, _count, ...task }) => ({
       ...task,
+      commentCount: _count.comments,
+      attachmentCount: _count.attachments,
       assigneeName: auth.data.name,
       projectId: project.id,
       projectTitle: project.title,
     })),
   };
+}
+
+// Drag and drop: changes the column and/or the place inside it. beforeTaskId
+// is the card the task is dropped in front of; null means the end of the
+// column and undefined leaves the position alone (status change only).
+export async function moveTask(input: {
+  taskId: string;
+  status: TaskStatus;
+  beforeTaskId?: string | null;
+}): Promise<ActionResult<void>> {
+  const auth = await getUserOrError();
+  if (!auth.success) return auth;
+
+  if (!input.taskId || !Object.values(TaskStatus).includes(input.status)) {
+    return { success: false, error: "Dados invalidos" };
+  }
+
+  const task = await prisma.task.findUnique({
+    where: { id: input.taskId },
+    select: {
+      assigneeId: true,
+      projectId: true,
+      status: true,
+      title: true,
+      position: true,
+    },
+  });
+  if (!task) return { success: false, error: "Tarefa nao encontrada" };
+
+  const canAccess = await canAccessProject(
+    auth.data.id,
+    auth.data.role,
+    task.projectId,
+  );
+  if (!canAccess) return { success: false, error: "Sem permissao" };
+
+  if (!isManagerRole(auth.data.role) && task.assigneeId !== auth.data.id) {
+    return { success: false, error: "Sem permissao" };
+  }
+
+  // The cards already in the target column, in the order they are shown.
+  const siblings = await prisma.task.findMany({
+    where: {
+      projectId: task.projectId,
+      status: input.status,
+      id: { not: input.taskId },
+    },
+    select: { id: true, position: true },
+    orderBy: [{ position: "asc" }, { createdAt: "desc" }],
+  });
+
+  let position = task.position;
+  let renumber = false;
+  let index = siblings.length;
+
+  if (input.beforeTaskId !== undefined) {
+    index = input.beforeTaskId
+      ? siblings.findIndex((sibling) => sibling.id === input.beforeTaskId)
+      : siblings.length;
+    if (index === -1) return { success: false, error: "Posicao invalida" };
+
+    const previous = siblings[index - 1];
+    const next = siblings[index];
+
+    if (!previous && !next) position = -(Date.now() / 1000);
+    else if (!previous) position = next.position - 1;
+    else if (!next) position = previous.position + 1;
+    else {
+      position = (previous.position + next.position) / 2;
+      // repeated halving eventually runs out of precision
+      renumber = next.position - previous.position < 1e-6;
+    }
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.task.update({
+      where: { id: input.taskId },
+      data: { status: input.status, position },
+    });
+
+    if (renumber) {
+      const base = siblings[0].position;
+      const order = [
+        ...siblings.slice(0, index).map((s) => s.id),
+        input.taskId,
+        ...siblings.slice(index).map((s) => s.id),
+      ];
+      for (const [i, id] of order.entries()) {
+        await tx.task.update({ where: { id }, data: { position: base + i } });
+      }
+    }
+
+    if (input.status !== task.status) {
+      await tx.projectLog.create({
+        data: {
+          projectId: task.projectId,
+          message: `Tarefa "${task.title}" atualizada. Status: ${getTaskStatusLabel(task.status)} -> ${getTaskStatusLabel(input.status)}.`,
+          authorName: auth.data.name,
+          isInternal: true,
+        },
+      });
+    }
+
+    await touchProject(tx, task.projectId);
+  });
+
+  revalidatePath("/kanban");
+  revalidatePath("/projetos");
+  revalidatePath("/logs");
+
+  return { success: true, data: undefined };
 }

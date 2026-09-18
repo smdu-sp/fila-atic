@@ -1,7 +1,12 @@
 "use server";
 
 import { isManagerRole } from "@/lib/roles";
-import { ProjectPriority, ProjectStatus, Role } from "@prisma/client";
+import {
+  ProjectCategory,
+  ProjectPriority,
+  ProjectStatus,
+  Role,
+} from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
@@ -40,6 +45,7 @@ type ProjectDetails = {
   priority: ProjectPriority;
   createdAt: Date;
   dueDate: Date | null;
+  category: ProjectCategory | null;
   closeReason: string | null;
   // until when the requester may reopen a closed request
   reopenUntil: Date | null;
@@ -131,6 +137,7 @@ export async function getProjectDetails(
       priority: true,
       createdAt: true,
       dueDate: true,
+      category: true,
       closeReason: true,
       updatedAt: true,
       requesterId: true,
@@ -194,6 +201,7 @@ export async function getProjectDetails(
       priority: project.priority,
       createdAt: project.createdAt,
       dueDate: project.dueDate,
+      category: project.category,
       closeReason: project.closeReason,
       reopenUntil: await reopenUntilIfOpen(
         project.id,

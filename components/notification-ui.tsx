@@ -25,6 +25,7 @@ const icons: Record<string, LucideIcon> = {
   STATUS_CHANGED: RefreshCw,
   DUE_CHANGED: CalendarClock,
   DEADLINE: AlarmClock,
+  TASK_COMMENT: MessageSquare,
 };
 
 export function NotificationIcon({

@@ -42,6 +42,14 @@ enum TaskStatus {
   CANCELED
 }
 
+enum ProjectCategory {
+  BUG
+  IMPROVEMENT
+  NEW_SYSTEM
+  SUPPORT
+  OTHER
+}
+
 enum RequestFieldType {
   TEXT
   LONG_TEXT
@@ -90,6 +98,8 @@ model Project {
   dueDate       DateTime?                  @db.Date
   // Why the request was cancelled or refused; shown to the requester.
   closeReason   String?                    @db.Text
+  // Kind of demand, set by the team when triaging.
+  category      ProjectCategory?
   developers    ProjectDeveloper[]
   tasks         Task[]
   logs          ProjectLog[]
@@ -127,12 +137,47 @@ model Task {
   description String?    @db.Text
   status      TaskStatus @default(TODO)
   dueDate     DateTime?  @db.Date
+  priority    ProjectPriority @default(MEDIUM)
+  // Free tags ("api", "banco de dados"), normalized by lib/taskFields.ts.
+  labels      String[]   @default([])
+  // Order inside a Kanban column (ascending). New tasks get -epoch seconds, so
+  // they land on top; moving a card sets a value between its new neighbours.
+  position    Float      @default(0)
+  comments    TaskComment[]
+  attachments TaskAttachment[]
   assigneeId  String?
   assignee    User?      @relation(fields: [assigneeId], references: [id])
   projectId   String
   project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
+}
+
+model TaskComment {
+  id         String   @id @default(uuid())
+  taskId     String
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  authorId   String
+  authorName String
+  message    String   @db.Text
+  createdAt  DateTime @default(now())
+
+  @@index([taskId, createdAt])
+}
+
+model TaskAttachment {
+  id             String   @id @default(uuid())
+  taskId         String
+  task           Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  fileName       String
+  fileUrl        String
+  fileType       String?
+  fileSize       Int
+  uploadedById   String
+  uploadedByName String
+  createdAt      DateTime @default(now())
+
+  @@index([taskId])
 }
 
 model TaskStatusLabel {
