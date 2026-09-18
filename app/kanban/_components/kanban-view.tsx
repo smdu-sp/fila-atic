@@ -13,7 +13,11 @@ import { toast } from "sonner";
 
 import { updateProject } from "@/actions/projectActions";
 import { updateProjectStatusRestricted } from "@/actions/solicitacaoActions";
-import { listTasksByProject, updateTask } from "@/actions/taskActions";
+import {
+  listMyTasks,
+  listTasksByProject,
+  updateTask,
+} from "@/actions/taskActions";
 import { updateTaskStatusLabels } from "@/actions/taskStatusActions";
 import {
   BoardColumn,
@@ -22,7 +26,14 @@ import {
   TaskCard,
   UserAvatar,
 } from "@/app/kanban/_components/board-ui";
+import {
+  AssigneeItems,
+  NO_ASSIGNEE,
+} from "@/app/kanban/_components/assignee-items";
 import { CreateTaskForm } from "@/app/kanban/_components/create-task-form";
+import { TaskProgress } from "@/components/task-progress";
+import { useStatusChangeGuard } from "@/components/use-status-change";
+import { summarizeTasks } from "@/lib/taskStatus";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -51,6 +62,9 @@ type ProjectItem = {
   priority: ProjectPriority;
   requesterName: string;
   requesterDepartment: string;
+  taskTotal: number;
+  taskDone: number;
+  developerIds: string[];
 };
 
 type TaskItem = {
@@ -61,6 +75,9 @@ type TaskItem = {
   assigneeId: string | null;
   assigneeName: string | null;
   createdAt: string | Date;
+  // only when tasks of several projects are listed together
+  projectId?: string;
+  projectTitle?: string;
 };
 
 type Assignee = { id: string; name: string };
@@ -74,6 +91,8 @@ type KanbanViewProps = {
   // Developers that can be picked as task owner (empty when the role cannot
   // assign tasks).
   assignees: Assignee[];
+  initialProjectId?: string;
+  initialTab?: "projects" | "tasks";
 };
 
 const projectColumns: { status: ProjectStatus; dot: string }[] = [
@@ -91,11 +110,13 @@ const taskColumns: { status: TaskStatus; dot: string }[] = [
   { status: TaskStatus.PAUSED, dot: "bg-orange-500" },
   { status: TaskStatus.DONE, dot: "bg-emerald-500" },
   { status: TaskStatus.DEPLOYED, dot: "bg-teal-500" },
+  { status: TaskStatus.CANCELED, dot: "bg-rose-400" },
 ];
 
 const taskStatusOrder = taskColumns.map((column) => column.status);
 
-const NO_ASSIGNEE = "none";
+// Special value of the project picker: my tasks, from every project.
+const MINE = "__mine__";
 
 export function KanbanView({
   projects,
@@ -104,13 +125,17 @@ export function KanbanView({
   role,
   currentUserId,
   assignees,
+  initialProjectId,
+  initialTab = "projects",
 }: KanbanViewProps) {
-  const [activeTab, setActiveTab] = useState<"projects" | "tasks">("projects");
+  const [activeTab, setActiveTab] = useState<"projects" | "tasks">(initialTab);
   const [search, setSearch] = useState("");
   const [assigneeFilter, setAssigneeFilter] = useState<string | null>(null);
   const [projectItems, setProjectItems] = useState(projects);
   const [selectedProjectId, setSelectedProjectId] = useState(
-    projects[0]?.id ?? "",
+    initialProjectId && projects.some((p) => p.id === initialProjectId)
+      ? initialProjectId
+      : (projects[0]?.id ?? ""),
   );
   // Tasks are tagged with the project they were loaded for, so an answer for
   // a project that is no longer selected is simply ignored.
@@ -148,6 +173,19 @@ export function KanbanView({
     setTaskData((prev) => ({ ...prev, items: update(prev.items) }));
   const reloadTasks = () => setReloadKey((key) => key + 1);
 
+  const statusGuard = useStatusChangeGuard<string>((status, projectId) =>
+    setProjectItems((prev) =>
+      prev.map((item) => (item.id === projectId ? { ...item, status } : item)),
+    ),
+  );
+  const isMine = selectedProjectId === MINE;
+  const taskSummary = useMemo(
+    () => summarizeTasks(tasks.map((task) => task.status)),
+    [tasks],
+  );
+  const teamIdsOf = (projectId: string | undefined) =>
+    projectItems.find((project) => project.id === projectId)?.developerIds ??
+    [];
   const isManager = role === Role.COORDINATOR || role === Role.DEV_GLOBAL;
   const canAssign = assignees.length > 0;
   const canMoveProjects = role !== Role.REQUESTER;
@@ -228,7 +266,8 @@ export function KanbanView({
     let cancelled = false;
     setTaskError(null);
 
-    listTasksByProject(selectedProjectId).then((result) => {
+    const load = isMine ? listMyTasks() : listTasksByProject(selectedProjectId);
+    load.then((result) => {
       if (cancelled) return;
       if (!result.success) {
         setTaskData({ projectId: selectedProjectId, items: [] });
@@ -241,7 +280,7 @@ export function KanbanView({
     return () => {
       cancelled = true;
     };
-  }, [activeTab, selectedProjectId, reloadKey]);
+  }, [activeTab, selectedProjectId, isMine, reloadKey]);
 
   useEffect(() => {
     setAssigneeFilter(null);
@@ -311,9 +350,33 @@ export function KanbanView({
     });
   };
 
+  const runProjectStatus = (
+    projectId: string,
+    status: ProjectStatus,
+    options: { confirmOpenTasks?: boolean; closeOpenTasks?: boolean } = {},
+  ) =>
+    role === Role.DEV_RESTRICTED
+      ? updateProjectStatusRestricted(projectId, status, options)
+      : updateProject({ id: projectId, status, ...options });
+
   const moveProject = (projectId: string, status: ProjectStatus) => {
     const project = projectItems.find((item) => item.id === projectId);
     if (!project || project.status === status || !canMoveProjects) return;
+
+    // Finishing with open tasks needs an answer first, so no optimistic move.
+    if (
+      status === ProjectStatus.FINISHED &&
+      project.taskTotal > project.taskDone
+    ) {
+      startTransition(async () => {
+        await statusGuard.request(
+          status,
+          (options) => runProjectStatus(projectId, status, options),
+          projectId,
+        );
+      });
+      return;
+    }
 
     const previous = projectItems;
     setProjectItems((prev) =>
@@ -321,10 +384,7 @@ export function KanbanView({
     );
 
     startTransition(async () => {
-      const result =
-        role === Role.DEV_RESTRICTED
-          ? await updateProjectStatusRestricted(projectId, status)
-          : await updateProject({ id: projectId, status });
+      const result = await runProjectStatus(projectId, status);
 
       if (!result.success) {
         toast.error(result.error);
@@ -435,7 +495,7 @@ export function KanbanView({
             />
           </div>
 
-          {activeTab === "tasks" && taskOwners.length ? (
+          {activeTab === "tasks" && !isMine && taskOwners.length ? (
             <div
               className="flex items-center -space-x-1.5"
               role="group"
@@ -478,6 +538,9 @@ export function KanbanView({
                 <SelectValue placeholder="Selecione um projeto" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value={MINE}>
+                  Minhas tarefas (todos os projetos)
+                </SelectItem>
                 {projectItems.map((project) => (
                   <SelectItem key={project.id} value={project.id}>
                     {project.title}
@@ -498,7 +561,7 @@ export function KanbanView({
             <Button
               size="sm"
               onClick={() => handleOpenCreate()}
-              disabled={!selectedProjectId}
+              disabled={!selectedProjectId || isMine}
             >
               <Plus />
               Nova tarefa
@@ -532,6 +595,8 @@ export function KanbanView({
                   priority={item.priority}
                   requesterName={item.requesterName}
                   requesterDepartment={item.requesterDepartment}
+                  taskDone={item.taskDone}
+                  taskTotal={item.taskTotal}
                   draggable={canMoveProjects}
                   dragging={draggingId === item.id}
                   onDragStart={handleDragStart(item.id)}
@@ -552,6 +617,18 @@ export function KanbanView({
               {taskError}
             </p>
           ) : null}
+          {!isMine && taskSummary.total > 0 ? (
+            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+              <span>Progresso do projeto</span>
+              <TaskProgress done={taskSummary.done} total={taskSummary.total} />
+              <span className="text-xs">
+                {taskSummary.percent}% concluído
+                {taskSummary.canceled
+                  ? ` · ${taskSummary.canceled} cancelada(s)`
+                  : ""}
+              </span>
+            </div>
+          ) : null}
           <div className="flex items-stretch gap-3 overflow-x-auto pb-3">
             {taskBoard.map((column) => (
               <BoardColumn
@@ -563,7 +640,7 @@ export function KanbanView({
                 drop={dropHandlers(column.status, (id) =>
                   moveTask(id, column.status),
                 )}
-                onAdd={() => handleOpenCreate(column.status)}
+                onAdd={isMine ? undefined : () => handleOpenCreate(column.status)}
               >
                 {loadingTasks ? (
                   <CardSkeletons />
@@ -574,6 +651,7 @@ export function KanbanView({
                       title={item.title}
                       createdAt={item.createdAt}
                       assigneeName={item.assigneeName}
+                      projectTitle={item.projectTitle}
                       draggable={canMoveTask(item)}
                       dragging={draggingId === item.id}
                       onDragStart={handleDragStart(item.id)}
@@ -593,6 +671,8 @@ export function KanbanView({
         </>
       )}
 
+      {statusGuard.dialog}
+
       <Dialog open={taskDialogOpen} onOpenChange={setTaskDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -610,6 +690,7 @@ export function KanbanView({
             initialStatus={createStatus}
             hideProjectSelect={Boolean(selectedProjectId)}
             assignees={assignees}
+            teamIds={teamIdsOf(selectedProjectId)}
             onCreated={handleCreated}
           />
         </DialogContent>
@@ -668,12 +749,12 @@ export function KanbanView({
                     <SelectValue placeholder="Sem responsável" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={NO_ASSIGNEE}>Sem responsável</SelectItem>
-                    {editAssigneeOptions.map((option) => (
-                      <SelectItem key={option.id} value={option.id}>
-                        {option.name}
-                      </SelectItem>
-                    ))}
+                    <AssigneeItems
+                      assignees={editAssigneeOptions}
+                      teamIds={teamIdsOf(
+                        editingTask?.projectId ?? selectedProjectId,
+                      )}
+                    />
                   </SelectContent>
                 </Select>
               </div>

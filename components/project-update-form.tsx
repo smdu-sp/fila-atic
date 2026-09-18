@@ -10,6 +10,7 @@ import { ProjectPriority, ProjectStatus } from "@prisma/client";
 import { updateProject } from "@/actions/projectActions";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
+import { useStatusChangeGuard } from "@/components/use-status-change";
 import {
   Select,
   SelectContent,
@@ -46,6 +47,7 @@ export function ProjectUpdateForm({
   showSubmit = true,
 }: ProjectUpdateFormProps) {
   const [isPending, startTransition] = useTransition();
+  const guard = useStatusChangeGuard(() => toast.success("Projeto atualizado."));
   const { control, handleSubmit } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -56,18 +58,14 @@ export function ProjectUpdateForm({
 
   const onSubmit = handleSubmit((values) => {
     startTransition(async () => {
-      const result = await updateProject({
-        id: projectId,
-        status: values.status,
-        priority: values.priority,
-      });
-
-      if (!result.success) {
-        toast.error(result.error);
-        return;
-      }
-
-      toast.success("Projeto atualizado.");
+      await guard.request(values.status, (options) =>
+        updateProject({
+          id: projectId,
+          status: values.status,
+          priority: values.priority,
+          ...options,
+        }),
+      );
     });
   });
 
@@ -81,6 +79,7 @@ export function ProjectUpdateForm({
   const priorityWidthClass = inline ? "w-[120px] shrink-0" : "w-full";
 
   return (
+    <>
     <Form onSubmit={onSubmit} className={formClassName} id={formId}>
       <Controller
         control={control}
@@ -124,5 +123,7 @@ export function ProjectUpdateForm({
         </Button>
       ) : null}
     </Form>
+    {guard.dialog}
+    </>
   );
 }

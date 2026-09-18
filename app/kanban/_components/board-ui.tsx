@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { TaskProgress } from "@/components/task-progress";
 import { Button } from "@/components/ui/button";
 import { getPriorityLabel } from "@/lib/projectLabels";
 import { cn } from "@/lib/utils";
@@ -193,6 +194,8 @@ export function ProjectCard({
   priority,
   requesterName,
   requesterDepartment,
+  taskDone,
+  taskTotal,
   draggable,
   dragging,
   onDragStart,
@@ -203,6 +206,8 @@ export function ProjectCard({
   priority: ProjectPriority;
   requesterName: string;
   requesterDepartment: string;
+  taskDone: number;
+  taskTotal: number;
 }) {
   return (
     <article
@@ -222,6 +227,9 @@ export function ProjectCard({
       >
         {title}
       </Link>
+      {taskTotal > 0 ? (
+        <TaskProgress className="mt-2" done={taskDone} total={taskTotal} />
+      ) : null}
       <div className="mt-3 flex items-center justify-between gap-2">
         <span className="flex min-w-0 items-center gap-2">
           <span
@@ -247,6 +255,7 @@ export function TaskCard({
   title,
   createdAt,
   assigneeName,
+  projectTitle,
   draggable,
   dragging,
   onDragStart,
@@ -256,6 +265,8 @@ export function TaskCard({
   title: string;
   createdAt: string | Date;
   assigneeName: string | null;
+  // Shown when tasks from several projects share the board ("my tasks").
+  projectTitle?: string;
   onOpen: () => void;
 }) {
   const handleKeyDown = (event: KeyboardEvent) => {
@@ -282,6 +293,11 @@ export function TaskCard({
       )}
     >
       <p className="line-clamp-3 font-medium leading-snug">{title}</p>
+      {projectTitle ? (
+        <p className="mt-1 truncate text-[11px] text-muted-foreground">
+          {projectTitle}
+        </p>
+      ) : null}
       <div className="mt-3 flex items-center justify-between gap-2">
         <span className="flex items-center gap-2">
           <span

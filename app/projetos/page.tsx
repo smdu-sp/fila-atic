@@ -3,6 +3,7 @@ import { Pencil } from "lucide-react";
 
 import { listProjects } from "@/actions/projectActions";
 import { listProjectRequestFields } from "@/actions/requestFormActions";
+import { TaskProgress } from "@/components/task-progress";
 import { getServerAuthSession, requireRole } from "@/lib/auth";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Badge } from "@/components/ui/badge";
@@ -123,6 +124,11 @@ export default async function ProjetosPage() {
                       <p className="text-xs text-muted-foreground">
                         {project.requesterName} · {project.requesterDepartment}
                       </p>
+                      <TaskProgress
+                        className="mt-1.5"
+                        done={project.taskDone}
+                        total={project.taskTotal}
+                      />
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge

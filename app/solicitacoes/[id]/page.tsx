@@ -22,7 +22,10 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { listTasksByProject } from "@/actions/taskActions";
+import { listTaskStatusLabels } from "@/actions/taskStatusActions";
 import { getServerAuthSession } from "@/lib/auth";
+import { taskStatusLabels as defaultTaskLabels } from "@/lib/projectLabels";
 import {
   getPriorityLabel,
   getStatusBadgeClass,
@@ -30,6 +33,7 @@ import {
 } from "@/lib/projectLabels";
 import { MessageForm } from "@/app/solicitacoes/[id]/_components/message-form";
 import { ProjectControls } from "@/app/solicitacoes/[id]/_components/project-controls";
+import { ProjectTasksPanel } from "@/app/solicitacoes/[id]/_components/project-tasks-panel";
 
 export default async function SolicitacaoDetalhePage({
   params,
@@ -63,6 +67,12 @@ export default async function SolicitacaoDetalhePage({
   const details = detailsResult.data;
   const messages = messagesResult.success ? messagesResult.data : [];
   const isRequester = session?.user?.role === Role.REQUESTER;
+  // Tasks are internal work: requesters only see the project status.
+  const [tasksResult, labelsResult] = isRequester
+    ? [null, null]
+    : await Promise.all([listTasksByProject(id), listTaskStatusLabels()]);
+  const projectTasks = tasksResult?.success ? tasksResult.data : [];
+  const taskLabels = labelsResult?.success ? labelsResult.data : defaultTaskLabels;
   const canRespond =
     session?.user?.role === Role.COORDINATOR ||
     session?.user?.role === Role.DEV_GLOBAL;
@@ -359,6 +369,26 @@ export default async function SolicitacaoDetalhePage({
                 </CardContent>
               </Card>
             </div>
+
+            {!isRequester ? (
+              <div className="mt-4">
+                <ProjectTasksPanel
+                  projectId={details.id}
+                  projectStatus={details.status}
+                  role={session?.user?.role ?? Role.REQUESTER}
+                  tasks={projectTasks}
+                  taskLabels={taskLabels}
+                  team={details.developers.map((dev) => ({
+                    id: dev.id,
+                    name: dev.name,
+                  }))}
+                  assignableDevelopers={assignableDevelopers.map((dev) => ({
+                    id: dev.id,
+                    name: dev.name,
+                  }))}
+                />
+              </div>
+            ) : null}
           </div>
         </SidebarInset>
       </SidebarProvider>

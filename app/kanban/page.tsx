@@ -14,8 +14,14 @@ import { KanbanView } from "@/app/kanban/_components/kanban-view";
 import { getServerAuthSession, requireRole } from "@/lib/auth";
 import { taskStatusLabels } from "@/lib/projectLabels";
 
-export default async function KanbanPage() {
+export default async function KanbanPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ projeto?: string }>;
+}) {
   await requireRole([Role.COORDINATOR, Role.DEV_GLOBAL, Role.DEV_RESTRICTED]);
+  // /kanban?projeto=<id> opens the task board of that project
+  const { projeto } = await searchParams;
 
   const [projectsResult, labelsResult, developersResult, session] =
     await Promise.all([
@@ -68,6 +74,8 @@ export default async function KanbanPage() {
               role={session?.user?.role ?? Role.REQUESTER}
               currentUserId={session?.user?.id ?? ""}
               assignees={assignees}
+              initialProjectId={projeto}
+              initialTab={projeto ? "tasks" : "projects"}
             />
           </div>
         </SidebarInset>

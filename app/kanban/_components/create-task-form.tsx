@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { TaskStatus } from "@prisma/client";
 
 import { createTask } from "@/actions/taskActions";
+import { AssigneeItems } from "@/app/kanban/_components/assignee-items";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -38,6 +39,8 @@ type CreateTaskFormProps = {
   hideProjectSelect?: boolean;
   // Empty when the current role cannot assign tasks.
   assignees?: Array<{ id: string; name: string }>;
+  // Members of the project: listed first in the assignee picker.
+  teamIds?: string[];
   onCreated?: () => void;
 };
 
@@ -47,6 +50,7 @@ export function CreateTaskForm({
   initialStatus,
   hideProjectSelect = false,
   assignees = [],
+  teamIds = [],
   onCreated,
 }: CreateTaskFormProps) {
   const [isPending, startTransition] = useTransition();
@@ -154,12 +158,7 @@ export function CreateTaskForm({
                 <SelectValue placeholder="Responsável (opcional)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">Sem responsável</SelectItem>
-                {assignees.map((assignee) => (
-                  <SelectItem key={assignee.id} value={assignee.id}>
-                    {assignee.name}
-                  </SelectItem>
-                ))}
+                <AssigneeItems assignees={assignees} teamIds={teamIds} />
               </SelectContent>
             </Select>
           )}

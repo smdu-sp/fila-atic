@@ -7,7 +7,10 @@ import { toast } from "sonner";
 
 import { assignDeveloper, removeDeveloper } from "@/actions/projectActions";
 import { updateProjectStatusRestricted } from "@/actions/solicitacaoActions";
+import { OpenTasksDialog } from "@/components/open-tasks-dialog";
 import { ProjectUpdateForm } from "@/components/project-update-form";
+import { useStatusChangeGuard } from "@/components/use-status-change";
+import type { OpenTask } from "@/lib/projectStatus";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -48,6 +51,16 @@ export function ProjectControls({
   const [selectedDev, setSelectedDev] = useState<string>("");
   const [isPending, startTransition] = useTransition();
   const [statusValue, setStatusValue] = useState<ProjectStatus>(defaultStatus);
+  const [removal, setRemoval] = useState<{
+    userId: string;
+    name: string;
+    openTasks: OpenTask[];
+  } | null>(null);
+  const guard = useStatusChangeGuard((status) => {
+    setStatusValue(status);
+    toast.success("Status atualizado.");
+    router.refresh();
+  });
   const canManageAll = role === Role.COORDINATOR || role === Role.DEV_GLOBAL;
   const canUpdateStatus = canManageAll || role === Role.DEV_RESTRICTED;
 
@@ -73,13 +86,21 @@ export function ProjectControls({
     });
   };
 
-  const handleRemove = (userId: string) => {
+  const handleRemove = (userId: string, unassignTasks = false) => {
     startTransition(async () => {
-      const result = await removeDeveloper({ projectId, userId });
+      const result = await removeDeveloper({ projectId, userId, unassignTasks });
       if (!result.success) {
+        if (result.openTasks?.length) {
+          const name =
+            assignedDevelopers.find((dev) => dev.id === userId)?.name ??
+            "O desenvolvedor";
+          setRemoval({ userId, name, openTasks: result.openTasks });
+          return;
+        }
         toast.error(result.error);
         return;
       }
+      setRemoval(null);
       toast.success("Desenvolvedor removido.");
       router.refresh();
     });
@@ -96,6 +117,7 @@ export function ProjectControls({
     : "grid gap-4 rounded-lg border border-border/60 p-4";
 
   return (
+    <>
     <div className={containerClassName}>
       {!isInline ? (
         <div className="grid gap-1">
@@ -111,18 +133,14 @@ export function ProjectControls({
             value={statusValue}
             onValueChange={(value) => {
               const nextStatus = value as ProjectStatus;
+              const previous = statusValue;
               setStatusValue(nextStatus);
               startTransition(async () => {
-                const result = await updateProjectStatusRestricted(
-                  projectId,
-                  nextStatus,
+                const applied = await guard.request(nextStatus, (options) =>
+                  updateProjectStatusRestricted(projectId, nextStatus, options),
                 );
-                if (!result.success) {
-                  toast.error(result.error);
-                  return;
-                }
-                toast.success("Status atualizado.");
-                router.refresh();
+                // refused, or waiting for the person to decide in the dialog
+                if (!applied) setStatusValue(previous);
               });
             }}
           >
@@ -239,5 +257,26 @@ export function ProjectControls({
         )
       ) : null}
     </div>
+    {guard.dialog}
+    <OpenTasksDialog
+      open={removal !== null}
+      title={`Remover ${removal?.name ?? ""} do projeto?`}
+      description={
+        removal?.openTasks.length === 1
+          ? "Há 1 tarefa em aberto com essa pessoa. Ao remover, ela fica sem responsável."
+          : `Há ${removal?.openTasks.length ?? 0} tarefas em aberto com essa pessoa. Ao remover, elas ficam sem responsável.`
+      }
+      openTasks={removal?.openTasks ?? []}
+      actions={[
+        {
+          label: "Remover e liberar tarefas",
+          variant: "destructive",
+          onClick: () => removal && handleRemove(removal.userId, true),
+        },
+      ]}
+      busy={isPending}
+      onClose={() => setRemoval(null)}
+    />
+    </>
   );
 }
