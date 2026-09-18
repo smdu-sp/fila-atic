@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:seed": "node --env-file=.env prisma/seed.mts"
+    "db:seed": "node --env-file=.env prisma/seed.mts",
+    "cron:deadlines": "node --env-file=.env scripts/deadline-reminders.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.2.0",

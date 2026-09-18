@@ -10,6 +10,7 @@ import { canAccessProject } from "@/lib/projectAccess";
 import { formatDueDate, parseDateInput, toDateInput } from "@/lib/dueDate";
 import { getTaskStatusLabel } from "@/lib/projectLabels";
 import { touchProject } from "@/lib/projectStatus";
+import { notifyTaskAssigned } from "@/lib/notifications";
 import { ensureTeamMember } from "@/lib/projectTeam";
 
 type ActionResult<T> =
@@ -70,6 +71,27 @@ async function findAssignee(assigneeId: string) {
   return assignee?.isActive && assignee.role !== Role.REQUESTER
     ? assignee
     : null;
+}
+
+async function announceAssignment(
+  projectId: string,
+  taskTitle: string,
+  assigneeId: string,
+  actorId: string,
+) {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { title: true },
+  });
+  if (!project) return;
+
+  await notifyTaskAssigned({
+    projectId,
+    projectTitle: project.title,
+    taskTitle,
+    userId: assigneeId,
+    exceptUserId: actorId,
+  });
 }
 
 export async function createTask(
@@ -143,6 +165,10 @@ export async function createTask(
     await touchProject(tx, input.projectId);
     return created;
   });
+
+  if (assigneeId) {
+    await announceAssignment(input.projectId, task.title, assigneeId, auth.data.id);
+  }
 
   revalidatePath("/kanban");
   revalidatePath("/projetos");
@@ -283,6 +309,15 @@ export async function updateTask(
 
     await touchProject(tx, task.projectId);
   });
+
+  if (newAssignee && input.assigneeId) {
+    await announceAssignment(
+      task.projectId,
+      nextTitle ?? task.title,
+      input.assigneeId,
+      auth.data.id,
+    );
+  }
 
   revalidatePath("/kanban");
   revalidatePath("/projetos");

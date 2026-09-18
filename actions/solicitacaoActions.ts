@@ -7,6 +7,10 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { canAccessProject } from "@/lib/projectAccess";
 import { notifyGuestRequester } from "@/lib/guestMail";
+import {
+  notifyRequesterOf,
+  notifyTeamOfRequesterMessage,
+} from "@/lib/notifications";
 import { getStatusLabel } from "@/lib/projectLabels";
 import {
   closeTasks,
@@ -297,6 +301,22 @@ export async function createProjectMessage(
     "Ha uma nova mensagem da equipe na sua solicitacao.",
   );
 
+  // The requester wrote: the team hears about it. Staff wrote: the requester does.
+  if (auth.data.role === Role.REQUESTER) {
+    await notifyTeamOfRequesterMessage({
+      projectId,
+      fromName: auth.data.name,
+      exceptUserId: auth.data.id,
+    });
+  } else {
+    await notifyRequesterOf({
+      projectId,
+      kind: "MESSAGE",
+      title: 'Nova mensagem da equipe em "{projeto}"',
+      exceptUserId: auth.data.id,
+    });
+  }
+
   return { success: true, data: undefined };
 }
 
@@ -371,6 +391,12 @@ export async function updateProjectStatusRestricted(
       projectId,
       `O status da sua solicitacao foi atualizado para "${getStatusLabel(status)}".`,
     );
+    await notifyRequesterOf({
+      projectId,
+      kind: "STATUS_CHANGED",
+      title: `Status de "{projeto}": ${getStatusLabel(status)}`,
+      exceptUserId: auth.data.id,
+    });
   }
 
   return { success: true, data: undefined };

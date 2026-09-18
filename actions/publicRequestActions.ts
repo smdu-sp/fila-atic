@@ -27,6 +27,10 @@ import {
   type ProjectRequestFieldConfig,
 } from "@/lib/requestForm";
 import { loadRequestFields } from "@/lib/requestFormServer";
+import {
+  notifyNewRequest,
+  notifyTeamOfRequesterMessage,
+} from "@/lib/notifications";
 import { recordStatusChange } from "@/lib/projectStatus";
 import { saveUploads, validateUploads } from "@/lib/uploads";
 
@@ -324,6 +328,13 @@ export async function confirmPublicRequest(
 
   if (!created) return expired;
 
+  await notifyNewRequest({
+    projectId: created.id,
+    title: pending.title,
+    requesterName: pending.name,
+    department: pending.department,
+  });
+
   revalidatePath("/");
   revalidatePath("/fila");
   revalidatePath("/projetos");
@@ -407,6 +418,11 @@ export async function createGuestMessage(
       attachments.length > 0
         ? { ...data, attachments: { create: attachments } }
         : data,
+  });
+
+  await notifyTeamOfRequesterMessage({
+    projectId: project.id,
+    fromName: project.requester.name,
   });
 
   revalidatePath(`/acompanhar/${token}`);

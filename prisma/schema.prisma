@@ -62,7 +62,10 @@ model User {
   // Created by the public request form after e-mail confirmation. Guests
   // cannot sign in; a coordinator registering the same e-mail promotes them.
   isGuest           Boolean            @default(false)
+  // Also send notifications by e-mail (they always appear in the app).
+  emailNotifications Boolean           @default(true)
   createdAt         DateTime           @default(now())
+  notifications     Notification[]
   requestedProjects Project[]          @relation("ProjectRequester")
   assignedProjects  ProjectDeveloper[]
   tasks             Task[]
@@ -179,6 +182,24 @@ model ProjectRequestField {
 
 // Public submission waiting for the e-mail confirmation link. Nothing reaches
 // User/Project until it is confirmed, so unverified spam stays out of the queue.
+// Something the person should know about: shown in the bell and, unless they
+// opted out, sent by e-mail. dedupeKey (already scoped to the user) lets
+// scheduled jobs run more than once without notifying twice.
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      String
+  title     String
+  body      String?   @db.Text
+  href      String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+  dedupeKey String?   @unique
+
+  @@index([userId, readAt, createdAt])
+}
+
 model PendingGuestRequest {
   id            String   @id @default(uuid())
   tokenHash     String   @unique

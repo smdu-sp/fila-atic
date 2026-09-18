@@ -232,8 +232,11 @@ describe("guest notifications from staff actions", () => {
     expect(toGuest[0].text).toContain(`/acompanhar/${"t".repeat(43)}`);
     expect(toGuest[0].text).not.toContain("Resposta da equipe");
 
-    // a regular requester gets nothing
+    // a regular requester is not a guest: no guest-style link e-mail. They get the
+    // account notification instead (covered in notifications.test.ts).
     await updateProject({ id: mine.id, status: ProjectStatus.IN_ANALYSIS });
-    expect(mailsSent()).toHaveLength(2);
+    expect(mailsSent().filter((m) => m.to === "g@teste.gov.br")).toHaveLength(2);
+    expect(mailsSent().some((m) => m.text.includes("/acompanhar/"))).toBe(true);
+    expect(mailsSent().at(-1)?.subject).toContain("Status de");
   });
 });

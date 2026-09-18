@@ -15,6 +15,11 @@ import { notifyGuestRequester } from "@/lib/guestMail";
 import { getPriorityLabel, getStatusLabel } from "@/lib/projectLabels";
 import { createProjectLog } from "@/lib/projectLogs";
 import {
+  notifyNewRequest,
+  notifyProjectAssigned,
+  notifyRequesterOf,
+} from "@/lib/notifications";
+import {
   closeTasks,
   planTaskDecision,
   recordStatusChange,
@@ -178,6 +183,18 @@ export async function createProject(
   revalidatePath("/kanban");
   revalidatePath("/logs");
 
+  const requester = await prisma.user.findUnique({
+    where: { id: auth.data.id },
+    select: { department: true },
+  });
+  await notifyNewRequest({
+    projectId: project.id,
+    title,
+    requesterName: auth.data.name,
+    department: requester?.department ?? "",
+    exceptUserId: auth.data.id,
+  });
+
   return { success: true, data: project.id };
 }
 
@@ -286,6 +303,28 @@ export async function updateProject(
       input.id,
       `O status da sua solicitacao foi atualizado para "${getStatusLabel(input.status)}".`,
     );
+  }
+
+  if (newStatus) {
+    await notifyRequesterOf({
+      projectId: input.id,
+      kind: "STATUS_CHANGED",
+      title: `Status de "{projeto}": ${getStatusLabel(newStatus)}`,
+      exceptUserId: auth.data.id,
+    });
+  }
+  if (
+    due.value !== undefined &&
+    toDateInput(due.value) !== toDateInput(current.dueDate)
+  ) {
+    await notifyRequesterOf({
+      projectId: input.id,
+      kind: "DUE_CHANGED",
+      title: due.value
+        ? `Previsão de entrega de "{projeto}": ${formatDueDate(due.value)}`
+        : 'Previsão de entrega de "{projeto}" removida',
+      exceptUserId: auth.data.id,
+    });
   }
 
   revalidatePath("/fila");
@@ -537,7 +576,7 @@ export async function assignDeveloper(
   const [project, developer] = await Promise.all([
     prisma.project.findUnique({
       where: { id: input.projectId },
-      select: { id: true },
+      select: { id: true, title: true },
     }),
     prisma.user.findUnique({
       where: { id: input.userId },
@@ -577,6 +616,13 @@ export async function assignDeveloper(
     message: `Desenvolvedor ${developer.name} atribuido ao projeto.`,
     authorName: auth.data.name,
     isInternal: true,
+  });
+
+  await notifyProjectAssigned({
+    projectId: input.projectId,
+    title: project.title,
+    userId: input.userId,
+    exceptUserId: auth.data.id,
   });
 
   revalidatePath("/projetos");
