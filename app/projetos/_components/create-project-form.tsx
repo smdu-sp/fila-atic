@@ -8,7 +8,8 @@ import { toast } from "sonner";
 import { ProjectPriority } from "@prisma/client";
 
 import { createProject } from "@/actions/projectActions";
-import { submitPublicRequest } from "@/actions/publicRequestActions";
+import { submitPublicRequestForm } from "@/actions/publicRequestActions";
+import { addRequestAttachments } from "@/actions/requestLifecycleActions";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -55,6 +56,13 @@ export function CreateProjectForm({
 }: CreateProjectFormProps) {
   const [isPending, startTransition] = useTransition();
   const [sentTo, setSentTo] = useState<string | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  // remounting the (uncontrolled) file input is how it gets emptied
+  const [fileInputKey, setFileInputKey] = useState(0);
+  const clearFiles = () => {
+    setFiles([]);
+    setFileInputKey((key) => key + 1);
+  };
   const { control, register, handleSubmit, reset, formState, setError } =
     useForm<FormValues>({
       resolver: zodResolver(schema),
@@ -153,16 +161,22 @@ export function CreateProjectForm({
 
     if (guest) {
       startTransition(async () => {
-        const result = await submitPublicRequest({
-          name: values.guestName ?? "",
-          email: values.guestEmail ?? "",
-          department: values.guestDepartment ?? "",
-          title: values.title,
-          description: values.description,
-          justification: values.justification,
-          customFields: values.customFields,
-          website: values.website,
-        });
+        const data = new FormData();
+        data.set(
+          "payload",
+          JSON.stringify({
+            name: values.guestName ?? "",
+            email: values.guestEmail ?? "",
+            department: values.guestDepartment ?? "",
+            title: values.title,
+            description: values.description,
+            justification: values.justification,
+            customFields: values.customFields,
+            website: values.website,
+          }),
+        );
+        files.forEach((file) => data.append("attachments", file));
+        const result = await submitPublicRequestForm(data);
 
         if (!result.success) {
           toast.error(result.error);
@@ -170,6 +184,7 @@ export function CreateProjectForm({
         }
 
         setSentTo(result.data.email);
+        clearFiles();
         reset();
       });
       return;
@@ -182,7 +197,20 @@ export function CreateProjectForm({
         return;
       }
 
+      if (files.length) {
+        const upload = new FormData();
+        upload.set("projectId", result.data);
+        files.forEach((file) => upload.append("attachments", file));
+        const uploaded = await addRequestAttachments(upload);
+        if (!uploaded.success) {
+          toast.error(
+            `Solicitação criada, mas os anexos não foram enviados: ${uploaded.error}`,
+          );
+        }
+      }
+
       toast.success("solicitação criada.");
+      clearFiles();
       reset();
     });
   });
@@ -444,6 +472,27 @@ export function CreateProjectForm({
           </div>
         );
       })}
+      <div className="grid gap-1.5">
+        <Label htmlFor="request-files">Anexos (opcional)</Label>
+        <Input
+          id="request-files"
+          key={fileInputKey}
+          type="file"
+          multiple
+          onChange={(event) => setFiles(Array.from(event.target.files ?? []))}
+        />
+        <span className="text-xs text-muted-foreground">
+          Até 3 arquivos de 10 MB (PDF, imagens e documentos do Office).
+        </span>
+        {files.map((file, index) => (
+          <div
+            key={`${file.name}-${file.size}-${index}`}
+            className="truncate rounded-lg border border-border/60 px-2 py-1 text-xs"
+          >
+            {file.name} · {(file.size / 1024 / 1024).toFixed(1)} MB
+          </div>
+        ))}
+      </div>
       <Button
         type="submit"
         disabled={isPending}

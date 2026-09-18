@@ -11,6 +11,7 @@ import {
 } from "@/actions/solicitacaoActions";
 import { AppSidebar } from "@/components/app-sidebar";
 import { DueBadge } from "@/components/due-badge";
+import { RequesterActions } from "@/components/requester-actions";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -133,6 +134,16 @@ export default async function SolicitacaoDetalhePage({
               </div>
             ) : null}
 
+            {isRequester ? (
+              <div className="mt-3">
+                <RequesterActions
+                  projectId={details.id}
+                  status={details.status}
+                  reopenUntil={details.reopenUntil}
+                />
+              </div>
+            ) : null}
+
             <div className="mt-6 grid gap-4 lg:grid-cols-[1.4fr_1fr]">
               <Card>
                 <CardHeader>
@@ -145,6 +156,14 @@ export default async function SolicitacaoDetalhePage({
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4 text-sm">
+                  {details.closeReason ? (
+                    <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-100">
+                      <p className="text-xs font-semibold uppercase tracking-wide">
+                        Motivo do cancelamento
+                      </p>
+                      <p className="mt-1 whitespace-pre-wrap">{details.closeReason}</p>
+                    </div>
+                  ) : null}
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge
                       variant="outline"

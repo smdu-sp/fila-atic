@@ -67,6 +67,10 @@ export default async function PublicRequestPage() {
         <Link href="/login" className="underline">
           Entrar no sistema
         </Link>
+        {" · "}
+        <Link href="/solicitar/reenviar" className="underline">
+          Perdi o link da minha solicitação
+        </Link>
       </p>
     </PublicShell>
   );

@@ -6,6 +6,7 @@ import { FileText } from "lucide-react";
 import { GuestMessageForm } from "@/app/acompanhar/[token]/_components/guest-message-form";
 import { PublicShell } from "@/app/solicitar/_components/public-shell";
 import { DueBadge } from "@/components/due-badge";
+import { RequesterActions } from "@/components/requester-actions";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -60,8 +61,12 @@ export default async function TrackRequestPage({
             <CardTitle>Solicitação não encontrada</CardTitle>
             <CardDescription>
               Confira o link recebido por e-mail.{" "}
+              <Link href="/solicitar/reenviar" className="underline">
+                Perdeu o e-mail? Reenviar meu link
+              </Link>{" "}
+              ou{" "}
               <Link href="/solicitar" className="underline">
-                Abrir uma nova solicitação
+                abrir uma nova solicitação
               </Link>
             </CardDescription>
           </CardHeader>
@@ -95,6 +100,14 @@ export default async function TrackRequestPage({
           <DueBadge dueDate={project.dueDate} closed={isClosed} />
         </CardHeader>
         <CardContent className="grid gap-4 text-sm">
+          {project.closeReason ? (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-100">
+              <p className="text-xs font-semibold uppercase tracking-wide">
+                Motivo do cancelamento
+              </p>
+              <p className="mt-1 whitespace-pre-wrap">{project.closeReason}</p>
+            </div>
+          ) : null}
           <div>
             <p className="text-xs font-medium text-muted-foreground">
               Descrição
@@ -117,6 +130,13 @@ export default async function TrackRequestPage({
           ))}
         </CardContent>
       </Card>
+
+      <RequesterActions
+        projectId={project.id}
+        token={token}
+        status={project.status}
+        reopenUntil={project.reopenUntil}
+      />
 
       <Card>
         <CardHeader>
