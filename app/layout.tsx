@@ -10,8 +10,14 @@ const sora = Sora({
 });
 
 export const metadata: Metadata = {
-  title: "Base de Desenvolvimento - ATIC",
-  description: "Base de Desenvolvimento 2026",
+  title: "Fila Atic",
+  description: "Fila de projetos de ATIC",
+  icons: {
+    icon: [
+      { url: "/smul_icone_azul.png", media: "(prefers-color-scheme: light)" },
+      { url: "/smul_icone_branco.png", media: "(prefers-color-scheme: dark)" },
+    ],
+  },
 };
 
 export default function RootLayout({
