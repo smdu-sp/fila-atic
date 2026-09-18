@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PageHeader } from "@/components/page-header";
 import { isCoordination } from "@/lib/roles";
 import { Role } from "@prisma/client";
 import { FileText } from "lucide-react";
@@ -18,11 +19,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import {
   SidebarInset,
   SidebarProvider,
-  SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { listTasksByProject } from "@/actions/taskActions";
 import { listTaskStatusLabels } from "@/actions/taskStatusActions";
@@ -98,21 +97,7 @@ export default async function SolicitacaoDetalhePage({
       <SidebarProvider>
         <AppSidebar />
         <SidebarInset className="min-w-0">
-          <header className="hidden h-16 shrink-0 items-center gap-2 bg-muted/50 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12 sm:flex">
-            <div className="flex items-center gap-2 px-3 sm:px-4">
-              <SidebarTrigger className="-ml-1 md:hidden" />
-              <Separator
-                orientation="vertical"
-                className="mr-2 h-4 md:ml-[-16px]"
-              />
-              <div className="flex flex-col">
-                <span className="text-sm font-semibold">Detalhes</span>
-                <span className="text-xs text-muted-foreground">
-                  {details.title}
-                </span>
-              </div>
-            </div>
-          </header>
+          <PageHeader title="Detalhes" subtitle={details.title} />
           <div className="w-full min-w-0 p-4 pt-6 sm:gap-4 sm:p-6 sm:pt-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="space-y-1">

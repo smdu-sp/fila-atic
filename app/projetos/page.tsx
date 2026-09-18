@@ -1,5 +1,6 @@
 import { ProjectPriority, ProjectStatus, Role } from "@prisma/client";
 
+import { PageHeader } from "@/components/page-header";
 import { COORDINATION_ROLES, isCoordination } from "@/lib/roles";
 import { listAssignableDevelopers } from "@/actions/solicitacaoActions";
 import { searchProjects, type ProjectSearch } from "@/actions/projectActions";
@@ -20,11 +21,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Separator } from "@/components/ui/separator";
 import {
   SidebarInset,
   SidebarProvider,
-  SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { CreateProjectForm } from "@/app/projetos/_components/create-project-form";
 import { EditProjectDialog } from "@/app/projetos/_components/edit-project-dialog";
@@ -151,18 +150,7 @@ export default async function ProjetosPage({
       <SidebarProvider>
         <AppSidebar />
         <SidebarInset className="min-w-0">
-          <header className="hidden h-16 shrink-0 items-center gap-2 bg-muted/50 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 sm:flex">
-            <div className="flex items-center gap-2 px-3 sm:px-4">
-              <SidebarTrigger className="-ml-1 md:hidden" />
-              <Separator
-                orientation="vertical"
-                className="mr-2 h-4 md:-ml-4"
-              />
-              <div className="flex flex-col">
-                <span className="text-sm font-semibold">Projetos</span>
-              </div>
-            </div>
-          </header>
+          <PageHeader title="Projetos" />
           <div className="grid w-full min-w-0 gap-6 bg-muted/50 p-4 pt-6 sm:p-6 sm:pt-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="flex flex-col gap-1">

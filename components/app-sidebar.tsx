@@ -11,7 +11,6 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 import { NavMain } from "@/components/nav-main";
-import { NotificationBell } from "@/components/notification-bell";
 import { NavUser } from "@/components/nav-user";
 import { SidebarToggleButton } from "@/components/sidebar-toggle";
 
@@ -23,7 +22,6 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
           <SidebarMenuItem>
             <SidebarToggleButton />
           </SidebarMenuItem>
-          <NotificationBell />
         </SidebarMenu>
       </SidebarHeader>
       <NavMain />

@@ -1,5 +1,6 @@
 import { ProjectStatus, Role } from "@prisma/client";
 
+import { PageHeader } from "@/components/page-header";
 import { isCoordination } from "@/lib/roles";
 import { listDashboardCharts } from "@/actions/dashboardActions";
 import { listProjectLogs } from "@/actions/logActions";
@@ -24,11 +25,9 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { DueBadge } from "@/components/due-badge";
-import { Separator } from "@/components/ui/separator";
 import {
   SidebarInset,
   SidebarProvider,
-  SidebarTrigger,
 } from "@/components/ui/sidebar";
 import Link from "next/link";
 import { getServerAuthSession } from "@/lib/auth";
@@ -149,18 +148,7 @@ export default async function Page() {
       <SidebarProvider>
         <AppSidebar />
         <SidebarInset className="min-w-0 min-h-svh bg-muted/50">
-          <header className="hidden h-16 shrink-0 items-center gap-2 bg-muted/50 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12 sm:flex">
-            <div className="flex items-center gap-2 px-3 sm:px-4">
-              <SidebarTrigger className="-ml-1 md:hidden" />
-              <Separator
-                orientation="vertical"
-                className="mr-2 h-4 md:ml-[-16px]"
-              />
-              <div className="flex flex-col">
-                <span className="text-sm font-semibold">Dashboard</span>
-              </div>
-            </div>
-          </header>
+          <PageHeader title="Dashboard" />
           <div className="w-full min-w-0 p-4 pt-6 sm:gap-4 sm:p-6 sm:pt-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h1 className="text-2xl font-semibold">Visao geral</h1>

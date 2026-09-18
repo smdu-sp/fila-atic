@@ -1,15 +1,14 @@
 import { Role } from "@prisma/client";
 
+import { PageHeader } from "@/components/page-header";
 import { COORDINATION_ROLES } from "@/lib/roles";
 import { searchProjectLogs, type LogSearch } from "@/actions/logActions";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ListFilters, type FilterField } from "@/components/list-filters";
 import { Pagination } from "@/components/pagination";
-import { Separator } from "@/components/ui/separator";
 import {
   SidebarInset,
   SidebarProvider,
-  SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { getServerAuthSession, requireRole } from "@/lib/auth";
 import { firstParam, oneOf, parsePage } from "@/lib/listParams";
@@ -97,18 +96,7 @@ export default async function LogsPage({
       <SidebarProvider>
         <AppSidebar />
         <SidebarInset className="min-w-0">
-          <header className="hidden h-16 shrink-0 items-center gap-2 bg-muted/50 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 sm:flex">
-            <div className="flex items-center gap-2 px-3 sm:px-4">
-              <SidebarTrigger className="-ml-1 md:hidden" />
-              <Separator
-                orientation="vertical"
-                className="mr-2 h-4 md:-ml-4"
-              />
-              <div className="flex flex-col">
-                <span className="text-sm font-semibold">Logs</span>
-              </div>
-            </div>
-          </header>
+          <PageHeader title="Logs" />
           <div className="grid w-full min-w-0 gap-6 bg-muted/50 p-4 pt-6 sm:p-6 sm:pt-4">
             <div className="flex flex-col gap-1">
               <h1 className="text-2xl font-semibold">Logs</h1>

@@ -1,4 +1,5 @@
 import { COORDINATION_ROLES } from "@/lib/roles";
+import { PageHeader } from "@/components/page-header";
 import { listUsers } from "@/actions/userActions";
 import { requireRole } from "@/lib/auth";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -9,11 +10,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import {
   SidebarInset,
   SidebarProvider,
-  SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { UsersTable } from "@/app/usuarios/_components/users-table";
 
@@ -28,18 +27,7 @@ export default async function UsuariosPage() {
       <SidebarProvider>
         <AppSidebar />
         <SidebarInset className="min-w-0">
-          <header className="hidden h-16 shrink-0 items-center gap-2 bg-muted/50 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12 sm:flex">
-            <div className="flex items-center gap-2 px-3 sm:px-4">
-              <SidebarTrigger className="-ml-1 md:hidden" />
-              <Separator
-                orientation="vertical"
-                className="mr-2 h-4 md:ml-[-16px]"
-              />
-              <div className="flex flex-col">
-                <span className="text-sm font-semibold">Usuarios</span>
-              </div>
-            </div>
-          </header>
+          <PageHeader title="Usuarios" />
           <div className="w-full min-w-0 bg-muted/50 p-4 pt-6 sm:gap-4 sm:p-6 sm:pt-4">
             <div className="flex flex-col gap-1">
               <h1 className="text-2xl font-semibold">Usuarios</h1>
