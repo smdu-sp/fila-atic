@@ -232,6 +232,7 @@ export async function listTasksByProject(projectId: string): Promise<
       description: string | null;
       status: TaskStatus;
       assigneeId: string | null;
+      assigneeName: string | null;
       createdAt: Date;
     }>
   >
@@ -261,10 +262,17 @@ export async function listTasksByProject(projectId: string): Promise<
       description: true,
       status: true,
       assigneeId: true,
+      assignee: { select: { name: true } },
       createdAt: true,
     },
     orderBy: { createdAt: "desc" },
   });
 
-  return { success: true, data: tasks };
+  return {
+    success: true,
+    data: tasks.map(({ assignee, ...task }) => ({
+      ...task,
+      assigneeName: assignee?.name ?? null,
+    })),
+  };
 }

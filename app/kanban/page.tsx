@@ -1,6 +1,7 @@
 import { Role } from "@prisma/client";
 
 import { listProjects } from "@/actions/projectActions";
+import { listAssignableDevelopers } from "@/actions/solicitacaoActions";
 import { listTaskStatusLabels } from "@/actions/taskStatusActions";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Separator } from "@/components/ui/separator";
@@ -10,18 +11,26 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { KanbanView } from "@/app/kanban/_components/kanban-view";
-import { getServerAuthSession } from "@/lib/auth";
+import { getServerAuthSession, requireRole } from "@/lib/auth";
 import { taskStatusLabels } from "@/lib/projectLabels";
 
 export default async function KanbanPage() {
-  const [projectsResult, labelsResult, session] = await Promise.all([
-    listProjects(),
-    listTaskStatusLabels(),
-    getServerAuthSession(),
-  ]);
+  await requireRole([Role.COORDINATOR, Role.DEV_GLOBAL, Role.DEV_RESTRICTED]);
+
+  const [projectsResult, labelsResult, developersResult, session] =
+    await Promise.all([
+      listProjects(),
+      listTaskStatusLabels(),
+      listAssignableDevelopers(),
+      getServerAuthSession(),
+    ]);
   const projects = projectsResult.success ? projectsResult.data : [];
   const labels = labelsResult.success ? labelsResult.data : taskStatusLabels;
   const canEditStatusLabels = session?.user?.role === Role.COORDINATOR;
+  // Only roles allowed to assign tasks get the list; others get an empty one.
+  const assignees = developersResult.success
+    ? developersResult.data.map(({ id, name }) => ({ id, name }))
+    : [];
 
   return (
     <div className="relative w-full overflow-x-hidden">
@@ -56,6 +65,9 @@ export default async function KanbanPage() {
               projects={projects}
               taskStatusLabels={labels}
               canEditStatusLabels={canEditStatusLabels}
+              role={session?.user?.role ?? Role.REQUESTER}
+              currentUserId={session?.user?.id ?? ""}
+              assignees={assignees}
             />
           </div>
         </SidebarInset>

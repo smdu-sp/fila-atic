@@ -26,6 +26,7 @@ const schema = z.object({
   title: z.string().min(3, "Informe o titulo"),
   description: z.string().optional(),
   status: z.nativeEnum(TaskStatus).optional(),
+  assigneeId: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -35,6 +36,8 @@ type CreateTaskFormProps = {
   initialProjectId?: string;
   initialStatus?: TaskStatus;
   hideProjectSelect?: boolean;
+  // Empty when the current role cannot assign tasks.
+  assignees?: Array<{ id: string; name: string }>;
   onCreated?: () => void;
 };
 
@@ -43,6 +46,7 @@ export function CreateTaskForm({
   initialProjectId,
   initialStatus,
   hideProjectSelect = false,
+  assignees = [],
   onCreated,
 }: CreateTaskFormProps) {
   const [isPending, startTransition] = useTransition();
@@ -54,6 +58,7 @@ export function CreateTaskForm({
         title: "",
         description: "",
         status: initialStatus,
+        assigneeId: "",
       },
     });
 
@@ -64,6 +69,7 @@ export function CreateTaskForm({
         title: "",
         description: "",
         status: initialStatus,
+        assigneeId: "",
       });
     }
   }, [initialProjectId, initialStatus, reset]);
@@ -75,6 +81,7 @@ export function CreateTaskForm({
         title: values.title,
         description: values.description,
         status: values.status,
+        assigneeId: values.assigneeId || null,
       });
 
       if (!result.success) {
@@ -88,6 +95,7 @@ export function CreateTaskForm({
         title: "",
         description: "",
         status: values.status,
+        assigneeId: "",
       });
       onCreated?.();
     });
@@ -123,14 +131,40 @@ export function CreateTaskForm({
         </>
       )}
       <div className="grid gap-2">
-        <Input placeholder="Titulo da tarefa" {...register("title")} />
+        <Input placeholder="Título da tarefa" {...register("title")} />
         {formState.errors.title ? (
           <span className="text-xs text-destructive">
             {formState.errors.title.message}
           </span>
         ) : null}
       </div>
-      <Input placeholder="Descricao (opcional)" {...register("description")} />
+      <Input placeholder="Descrição (opcional)" {...register("description")} />
+      {assignees.length ? (
+        <Controller
+          control={control}
+          name="assigneeId"
+          render={({ field }) => (
+            <Select
+              value={field.value || "none"}
+              onValueChange={(value) =>
+                field.onChange(value === "none" ? "" : value)
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Responsável (opcional)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Sem responsável</SelectItem>
+                {assignees.map((assignee) => (
+                  <SelectItem key={assignee.id} value={assignee.id}>
+                    {assignee.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        />
+      ) : null}
       <Button type="submit" disabled={isPending}>
         {isPending ? "Criando" : "Criar tarefa"}
       </Button>
