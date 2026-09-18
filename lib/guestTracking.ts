@@ -34,6 +34,7 @@ export async function getTrackedProject(token: string) {
       status: true,
       priority: true,
       createdAt: true,
+      dueDate: true,
       requester: { select: { name: true } },
       requestValues: {
         select: {
@@ -83,6 +84,7 @@ export async function getTrackedProject(token: string) {
     status: project.status,
     priority: project.priority,
     createdAt: project.createdAt,
+    dueDate: project.dueDate,
     requesterName: project.requester.name,
     customFields,
     messages: project.logs,

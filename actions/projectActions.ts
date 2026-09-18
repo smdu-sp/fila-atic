@@ -22,6 +22,13 @@ import {
   type StatusChangeOptions,
 } from "@/lib/projectStatus";
 import { CLOSED_TASK_STATUSES, DONE_TASK_STATUSES } from "@/lib/taskStatus";
+import {
+  formatDueDate,
+  parseDateInput,
+  toDateInput,
+  todayInAppZone,
+} from "@/lib/dueDate";
+import { PAGE_SIZE, pageCount, type Page } from "@/lib/listParams";
 import { hasCustomValue } from "@/lib/requestForm";
 import { deleteUploads } from "@/lib/uploads";
 
@@ -44,6 +51,8 @@ type UpdateProjectInput = {
   justification?: string;
   priority?: ProjectPriority;
   status?: ProjectStatus;
+  // "YYYY-MM-DD" sets the delivery forecast, null clears it, undefined leaves it.
+  dueDate?: string | null;
 } & StatusChangeOptions;
 
 type AssignDeveloperInput = {
@@ -189,9 +198,14 @@ export async function updateProject(
     return { success: false, error: "Status invalido" };
   }
 
+  const due = parseDateInput(input.dueDate);
+  if (!due.ok) {
+    return { success: false, error: "Data de previsao invalida" };
+  }
+
   const current = await prisma.project.findUnique({
     where: { id: input.id },
-    select: { title: true, status: true, priority: true },
+    select: { title: true, status: true, priority: true, dueDate: true },
   });
 
   if (!current) {
@@ -208,6 +222,15 @@ export async function updateProject(
     updates.push(
       `Prioridade: ${getPriorityLabel(current.priority)} -> ${getPriorityLabel(input.priority)}`,
     );
+  }
+
+  if (
+    due.value !== undefined &&
+    toDateInput(due.value) !== toDateInput(current.dueDate)
+  ) {
+    const label = (date: Date | null) =>
+      date ? formatDueDate(date) : "sem previsao";
+    updates.push(`Previsao: ${label(current.dueDate)} -> ${label(due.value)}`);
   }
 
   const newStatus =
@@ -231,6 +254,7 @@ export async function updateProject(
           : undefined,
         priority: input.priority,
         status: input.status,
+        dueDate: due.value,
       },
     });
 
@@ -325,44 +349,47 @@ export type ProjectListItem = {
   requesterDepartment: string;
   createdAt: Date;
   updatedAt: Date;
+  dueDate: Date | null;
   // Cancelled tasks are left out of both numbers.
   taskTotal: number;
   taskDone: number;
   developerIds: string[];
 };
 
-export async function listProjects(): Promise<
-  ActionResult<ProjectListItem[]>
-> {
-  const auth = await getUserOrError();
-  if (!auth.success) return auth;
+const projectListSelect = {
+  id: true,
+  title: true,
+  status: true,
+  priority: true,
+  requesterId: true,
+  requester: { select: { name: true, department: true } },
+  createdAt: true,
+  updatedAt: true,
+  dueDate: true,
+  developers: { select: { userId: true } },
+} satisfies Prisma.ProjectSelect;
 
-  const where: Prisma.ProjectWhereInput =
-    auth.data.role === Role.REQUESTER
-      ? { requesterId: auth.data.id }
-      : auth.data.role === Role.DEV_RESTRICTED
-        ? { developers: { some: { userId: auth.data.id } } }
-        : {};
+type ProjectListRow = Prisma.ProjectGetPayload<{
+  select: typeof projectListSelect;
+}>;
 
-  const projects = await prisma.project.findMany({
-    where,
-    select: {
-      id: true,
-      title: true,
-      status: true,
-      priority: true,
-      requesterId: true,
-      requester: { select: { name: true, department: true } },
-      createdAt: true,
-      updatedAt: true,
-      developers: { select: { userId: true } },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+// What each role may see: requesters their own, restricted developers the
+// projects they belong to, everyone else all of them.
+function visibleTo(auth: { id: string; role: Role }): Prisma.ProjectWhereInput {
+  if (auth.role === Role.REQUESTER) return { requesterId: auth.id };
+  if (auth.role === Role.DEV_RESTRICTED) {
+    return { developers: { some: { userId: auth.id } } };
+  }
+  return {};
+}
 
+async function toListItems(
+  rows: ProjectListRow[],
+  role: Role,
+): Promise<ProjectListItem[]> {
   const counts = await prisma.task.groupBy({
     by: ["projectId", "status"],
-    where: { projectId: { in: projects.map((project) => project.id) } },
+    where: { projectId: { in: rows.map((row) => row.id) } },
     _count: { _all: true },
   });
 
@@ -375,26 +402,118 @@ export async function listProjects(): Promise<
     progress.set(row.projectId, entry);
   }
 
+  return rows.map((item) => ({
+    id: item.id,
+    title: item.title,
+    status: item.status,
+    priority: item.priority,
+    requesterId: item.requesterId,
+    requesterName: item.requester.name,
+    requesterDepartment: item.requester.department,
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
+    dueDate: item.dueDate,
+    taskTotal: progress.get(item.id)?.total ?? 0,
+    taskDone: progress.get(item.id)?.done ?? 0,
+    // requesters do not need to know who is on the team
+    developerIds:
+      role === Role.REQUESTER ? [] : item.developers.map((dev) => dev.userId),
+  }));
+}
+
+// Everything the user can see, newest first. The Kanban and the dashboard
+// need the whole set; list pages use searchProjects.
+export async function listProjects(): Promise<
+  ActionResult<ProjectListItem[]>
+> {
+  const auth = await getUserOrError();
+  if (!auth.success) return auth;
+
+  const rows = await prisma.project.findMany({
+    where: visibleTo(auth.data),
+    select: projectListSelect,
+    orderBy: { createdAt: "desc" },
+  });
+
+  return { success: true, data: await toListItems(rows, auth.data.role) };
+}
+
+export type ProjectSearch = {
+  q?: string;
+  status?: ProjectStatus;
+  priority?: ProjectPriority;
+  developerId?: string;
+  overdue?: boolean;
+  sort?: "recent" | "due" | "updated";
+  page?: number;
+};
+
+export async function searchProjects(
+  params: ProjectSearch = {},
+): Promise<ActionResult<Page<ProjectListItem>>> {
+  const auth = await getUserOrError();
+  if (!auth.success) return auth;
+
+  const filters: Prisma.ProjectWhereInput[] = [visibleTo(auth.data)];
+
+  const q = params.q?.trim().slice(0, 100);
+  if (q) {
+    filters.push({
+      OR: [
+        { title: { contains: q, mode: "insensitive" } },
+        { requester: { name: { contains: q, mode: "insensitive" } } },
+        { requester: { department: { contains: q, mode: "insensitive" } } },
+      ],
+    });
+  }
+  if (params.status && Object.values(ProjectStatus).includes(params.status)) {
+    filters.push({ status: params.status });
+  }
+  if (
+    params.priority &&
+    Object.values(ProjectPriority).includes(params.priority)
+  ) {
+    filters.push({ priority: params.priority });
+  }
+  if (params.developerId) {
+    filters.push({ developers: { some: { userId: params.developerId } } });
+  }
+  if (params.overdue) {
+    filters.push({
+      dueDate: { lt: todayInAppZone() },
+      status: { notIn: [ProjectStatus.FINISHED, ProjectStatus.CANCELED] },
+    });
+  }
+
+  const orderBy: Prisma.ProjectOrderByWithRelationInput[] =
+    params.sort === "due"
+      ? [{ dueDate: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }]
+      : params.sort === "updated"
+        ? [{ updatedAt: "desc" }]
+        : [{ createdAt: "desc" }];
+
+  const where: Prisma.ProjectWhereInput = { AND: filters };
+  const total = await prisma.project.count({ where });
+  const pages = pageCount(total);
+  const page = Math.min(Math.max(1, Math.trunc(params.page ?? 1)), pages);
+
+  const rows = await prisma.project.findMany({
+    where,
+    select: projectListSelect,
+    orderBy,
+    skip: (page - 1) * PAGE_SIZE,
+    take: PAGE_SIZE,
+  });
+
   return {
     success: true,
-    data: projects.map((item) => ({
-      id: item.id,
-      title: item.title,
-      status: item.status,
-      priority: item.priority,
-      requesterId: item.requesterId,
-      requesterName: item.requester.name,
-      requesterDepartment: item.requester.department,
-      createdAt: item.createdAt,
-      updatedAt: item.updatedAt,
-      taskTotal: progress.get(item.id)?.total ?? 0,
-      taskDone: progress.get(item.id)?.done ?? 0,
-      // requesters do not need to know who is on the team
-      developerIds:
-        auth.data.role === Role.REQUESTER
-          ? []
-          : item.developers.map((entry) => entry.userId),
-    })),
+    data: {
+      items: await toListItems(rows, auth.data.role),
+      total,
+      page,
+      pageSize: PAGE_SIZE,
+      pageCount: pages,
+    },
   };
 }
 

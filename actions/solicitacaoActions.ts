@@ -28,6 +28,7 @@ type ProjectDetails = {
   status: ProjectStatus;
   priority: ProjectPriority;
   createdAt: Date;
+  dueDate: Date | null;
   requester: {
     name: string;
     email: string;
@@ -116,6 +117,7 @@ export async function getProjectDetails(
       status: true,
       priority: true,
       createdAt: true,
+      dueDate: true,
       requesterId: true,
       requester: {
         select: { name: true, email: true, department: true },
@@ -176,6 +178,7 @@ export async function getProjectDetails(
       status: project.status,
       priority: project.priority,
       createdAt: project.createdAt,
+      dueDate: project.dueDate,
       requester: {
         name: project.requester.name,
         email: project.requester.email,

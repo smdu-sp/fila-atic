@@ -80,6 +80,9 @@ model Project {
   // Secret in the public tracking link (/acompanhar/<token>) of requests
   // opened through the public form.
   trackingToken String?            @unique
+  // Delivery forecast set by the team. A date, not a moment: stored as DATE so
+  // it never shifts with the time zone.
+  dueDate       DateTime?                  @db.Date
   developers    ProjectDeveloper[]
   tasks         Task[]
   logs          ProjectLog[]
@@ -116,6 +119,7 @@ model Task {
   title       String
   description String?    @db.Text
   status      TaskStatus @default(TODO)
+  dueDate     DateTime?  @db.Date
   assigneeId  String?
   assignee    User?      @relation(fields: [assigneeId], references: [id])
   projectId   String

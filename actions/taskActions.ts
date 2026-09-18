@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { canAccessProject } from "@/lib/projectAccess";
+import { formatDueDate, parseDateInput, toDateInput } from "@/lib/dueDate";
 import { getTaskStatusLabel } from "@/lib/projectLabels";
 import { touchProject } from "@/lib/projectStatus";
 import { ensureTeamMember } from "@/lib/projectTeam";
@@ -20,6 +21,8 @@ type CreateTaskInput = {
   description?: string;
   assigneeId?: string | null;
   status?: TaskStatus;
+  // "YYYY-MM-DD"; null or empty means no due date.
+  dueDate?: string | null;
 };
 
 type UpdateTaskInput = {
@@ -28,6 +31,8 @@ type UpdateTaskInput = {
   description?: string | null;
   status?: TaskStatus;
   assigneeId?: string | null;
+  // "YYYY-MM-DD" sets it, null clears it, undefined leaves it.
+  dueDate?: string | null;
 };
 
 function normalize(input: string) {
@@ -97,6 +102,11 @@ export async function createTask(
     return { success: false, error: "Sem permissao" };
   }
 
+  const due = parseDateInput(input.dueDate);
+  if (!due.ok) {
+    return { success: false, error: "Prazo invalido" };
+  }
+
   const assigneeId = input.assigneeId || null;
   if (assigneeId) {
     if (!mayAssign(auth.data, assigneeId)) {
@@ -115,6 +125,7 @@ export async function createTask(
         description: input.description?.trim() || null,
         assigneeId,
         status: input.status ?? TaskStatus.TODO,
+        dueDate: due.value ?? null,
       },
     });
 
@@ -165,11 +176,17 @@ export async function updateTask(
       status: true,
       title: true,
       description: true,
+      dueDate: true,
     },
   });
 
   if (!task) {
     return { success: false, error: "Tarefa nao encontrada" };
+  }
+
+  const due = parseDateInput(input.dueDate);
+  if (!due.ok) {
+    return { success: false, error: "Prazo invalido" };
   }
 
   const canAccess = await canAccessProject(
@@ -225,6 +242,14 @@ export async function updateTask(
       `Status: ${getTaskStatusLabel(task.status)} -> ${getTaskStatusLabel(nextStatus)}`,
     );
   }
+  if (
+    due.value !== undefined &&
+    toDateInput(due.value) !== toDateInput(task.dueDate)
+  ) {
+    const label = (date: Date | null) =>
+      date ? formatDueDate(date) : "sem prazo";
+    changes.push(`Prazo: ${label(task.dueDate)} -> ${label(due.value)}`);
+  }
   if (newAssignee !== undefined) {
     changes.push(
       `Responsavel: ${task.assignee?.name ?? "sem responsavel"} -> ${newAssignee?.name ?? "sem responsavel"}`,
@@ -239,6 +264,7 @@ export async function updateTask(
         description: nextDescription,
         status: nextStatus,
         assigneeId: input.assigneeId,
+        dueDate: due.value,
       },
     });
 
@@ -319,6 +345,7 @@ export async function listTasksByProject(projectId: string): Promise<
       status: TaskStatus;
       assigneeId: string | null;
       assigneeName: string | null;
+      dueDate: Date | null;
       createdAt: Date;
     }>
   >
@@ -349,6 +376,7 @@ export async function listTasksByProject(projectId: string): Promise<
       status: true,
       assigneeId: true,
       assignee: { select: { name: true } },
+      dueDate: true,
       createdAt: true,
     },
     orderBy: { createdAt: "desc" },
@@ -373,6 +401,7 @@ export async function listMyTasks(): Promise<
       status: TaskStatus;
       assigneeId: string | null;
       assigneeName: string | null;
+      dueDate: Date | null;
       createdAt: Date;
       projectId: string;
       projectTitle: string;
@@ -400,6 +429,7 @@ export async function listMyTasks(): Promise<
       description: true,
       status: true,
       assigneeId: true,
+      dueDate: true,
       createdAt: true,
       project: { select: { id: true, title: true } },
     },
