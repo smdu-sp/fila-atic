@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { EmailPreference } from "@/app/perfil/_components/email-preference";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
   Card,
@@ -35,6 +36,7 @@ export default async function PerfilPage() {
       role: true,
       createdAt: true,
       isActive: true,
+      emailNotifications: true,
     },
   });
 
@@ -124,6 +126,19 @@ export default async function PerfilPage() {
                 </CardContent>
               </Card>
             </div>
+
+            <Card className="mt-4">
+              <CardHeader>
+                <CardTitle>Notificações</CardTitle>
+                <CardDescription>
+                  Avisos sobre novas solicitações, tarefas atribuídas,
+                  mensagens, mudanças de status e prazos.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <EmailPreference initial={user.emailNotifications} />
+              </CardContent>
+            </Card>
           </div>
         </SidebarInset>
       </SidebarProvider>

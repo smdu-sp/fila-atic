@@ -57,9 +57,36 @@ Sem o passo 5 não há quem cadastre os demais usuários. Se o e-mail já existi
 | `LDAP_BIND_DN` / `LDAP_BIND_PASSWORD` | Usuário de serviço (ou `USER_LDAP` + `LDAP_DOMAIN` / `PASS_LDAP`) |
 | `ENVIRONMENT` | `local` pula o LDAP e aceita qualquer senha não vazia |
 | `PUBLIC_REQUEST_ALLOWED_DOMAINS` | Domínios de e-mail (separados por vírgula) que podem abrir solicitações em `/solicitar` sem conta. Vazio desativa a função |
+| `CRON_SECRET` | Segredo que autoriza o agendador a chamar `/api/cron/deadline-reminders` (avisos de prazo). Vazio desativa a rota |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | Envio de e-mails (confirmação e avisos). Sem `SMTP_HOST`, fora de produção o e-mail é impresso no console |
 
 `ENVIRONMENT=local` só vale fora de builds de produção (`NODE_ENV !== "production"`); em produção o LDAP é sempre usado.
+
+## Notificações
+
+Cada pessoa com conta recebe avisos no sino da barra lateral (e na página `/notificacoes`) e, se não desligar em **Perfil**, também por e-mail:
+
+- nova solicitação (coordenação, incluindo Tech Lead);
+- tarefa atribuída e inclusão em um projeto (a pessoa atribuída);
+- mensagem nova: da equipe para o solicitante, e do solicitante (com conta ou convidado) para a equipe do projeto (ou para a coordenação, se ainda não há equipe);
+- mudança de status e de previsão de entrega (solicitante);
+- prazos: tarefa ou projeto que vence amanhã, vence hoje ou acabou de atrasar.
+
+Quem causa o evento nunca é avisado dele. Convidados (formulário público) não têm conta: continuam recebendo os e-mails com o link de acompanhamento.
+
+### Avisos de prazo (tarefa agendada)
+
+Os avisos de prazo não disparam sozinhos: alguém precisa chamar a rota uma vez por dia. Defina `CRON_SECRET` no `.env` (o mesmo valor deve estar no ambiente do servidor) e agende:
+
+```bash
+# Linux/macOS (cron), todo dia às 7h
+0 7 * * * cd /caminho/fila-atic && npm run cron:deadlines
+
+# Windows (Agendador de Tarefas)
+schtasks /create /tn "Fila ATIC - avisos de prazo" /sc daily /st 07:00 /tr "cmd /c cd /d D:\caminho\fila-atic && npm run cron:deadlines"
+```
+
+Rodar mais de uma vez no dia é seguro: cada aviso é entregue uma única vez. A mesma execução apaga notificações lidas há mais de 60 dias e qualquer uma com mais de 180. Sem o agendador, todos os outros avisos continuam funcionando; só os de prazo deixam de sair.
 
 ## Anexos
 
@@ -71,4 +98,5 @@ Os anexos das mensagens ficam em `storage/uploads/` (fora de `public/`, ignorado
 - `npm run build` / `npm start`: build e execução de produção
 - `npm run lint`: ESLint
 - `npm test`: testes automatizados (Vitest). Usam um banco próprio, `<nome>_test` no mesmo servidor, criado e migrado automaticamente. Nunca tocam no banco de desenvolvimento.
+- `npm run cron:deadlines`: dispara os avisos de prazo no servidor em execução (ver Notificações)
 - `npm run db:seed`: cria ou promove o primeiro coordenador (`SEED_COORDINATOR_EMAIL`)
