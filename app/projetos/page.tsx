@@ -3,7 +3,7 @@ import { Pencil } from "lucide-react";
 
 import { listProjects } from "@/actions/projectActions";
 import { listProjectRequestFields } from "@/actions/requestFormActions";
-import { getServerAuthSession } from "@/lib/auth";
+import { getServerAuthSession, requireRole } from "@/lib/auth";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -48,6 +48,8 @@ const priorityVariant: Record<
 };
 
 export default async function ProjetosPage() {
+  await requireRole([Role.COORDINATOR, Role.DEV_GLOBAL, Role.DEV_RESTRICTED]);
+
   const [projectsResult, fieldsResult, session] = await Promise.all([
     listProjects(),
     listProjectRequestFields(),

@@ -1,4 +1,7 @@
+import { Role } from "@prisma/client";
+
 import { listUsers } from "@/actions/userActions";
+import { requireRole } from "@/lib/auth";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
   Card,
@@ -16,6 +19,8 @@ import {
 import { UsersTable } from "@/app/usuarios/_components/users-table";
 
 export default async function UsuariosPage() {
+  await requireRole([Role.COORDINATOR]);
+
   const result = await listUsers();
   const users = result.success ? result.data : [];
 

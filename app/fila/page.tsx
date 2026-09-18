@@ -1,4 +1,5 @@
-import { ProjectPriority } from "@prisma/client";
+import { ProjectPriority, Role } from "@prisma/client";
+import { requireRole } from "@/lib/auth";
 
 import { listQueueProjects } from "@/actions/queueActions";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -35,6 +36,8 @@ const priorityVariant: Record<
 };
 
 export default async function FilaPage() {
+  await requireRole([Role.COORDINATOR]);
+
   const result = await listQueueProjects();
   const projects = result.success ? result.data : [];
   const totalQueue = projects.length;

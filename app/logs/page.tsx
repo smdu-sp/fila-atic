@@ -6,7 +6,8 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { getServerAuthSession } from "@/lib/auth";
+import { Role } from "@prisma/client";
+import { getServerAuthSession, requireRole } from "@/lib/auth";
 import {
   priorityLabels,
   statusLabels,
@@ -14,6 +15,8 @@ import {
 } from "@/lib/projectLabels";
 
 export default async function LogsPage() {
+  await requireRole([Role.COORDINATOR, Role.DEV_GLOBAL, Role.DEV_RESTRICTED]);
+
   const result = await listProjectLogs();
   const logs = result.success ? result.data : [];
   const session = await getServerAuthSession();

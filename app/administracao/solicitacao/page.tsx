@@ -15,10 +15,12 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { getServerAuthSession } from "@/lib/auth";
+import { getServerAuthSession, requireRole } from "@/lib/auth";
 import { RequestFormSettings } from "@/app/administracao/solicitacao/_components/request-form-settings";
 
 export default async function SolicitationAdminPage() {
+  await requireRole([Role.COORDINATOR]);
+
   const [fieldsResult, session] = await Promise.all([
     listProjectRequestFields({ includeInactive: true }),
     getServerAuthSession(),
