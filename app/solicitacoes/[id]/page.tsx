@@ -30,6 +30,7 @@ import { getServerAuthSession } from "@/lib/auth";
 import { formatDueDate, toDateInput } from "@/lib/dueDate";
 import { taskStatusLabels as defaultTaskLabels } from "@/lib/projectLabels";
 import {
+  getCategoryLabel,
   getPriorityLabel,
   getStatusBadgeClass,
   getStatusLabel,
@@ -123,6 +124,7 @@ export default async function SolicitacaoDetalhePage({
                   defaultStatus={details.status}
                   defaultPriority={details.priority}
                   defaultDueDate={toDateInput(details.dueDate)}
+                  defaultCategory={details.category}
                   assignedDevelopers={details.developers.map((dev) => ({
                     id: dev.id,
                     name: dev.name,
@@ -174,6 +176,11 @@ export default async function SolicitacaoDetalhePage({
                     {!isRequester ? (
                       <Badge variant="secondary">
                         {getPriorityLabel(details.priority)}
+                      </Badge>
+                    ) : null}
+                    {details.category ? (
+                      <Badge variant="outline">
+                        {getCategoryLabel(details.category)}
                       </Badge>
                     ) : null}
                     <DueBadge

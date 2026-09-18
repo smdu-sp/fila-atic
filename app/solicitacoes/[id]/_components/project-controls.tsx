@@ -3,7 +3,12 @@
 import { isCoordination } from "@/lib/roles";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Role, ProjectPriority, ProjectStatus } from "@prisma/client";
+import {
+  Role,
+  type ProjectCategory,
+  ProjectPriority,
+  ProjectStatus,
+} from "@prisma/client";
 import { toast } from "sonner";
 
 import { assignDeveloper, removeDeveloper } from "@/actions/projectActions";
@@ -36,6 +41,7 @@ type ProjectControlsProps = {
   defaultPriority: ProjectPriority;
   // "YYYY-MM-DD" of the delivery forecast, when there is one.
   defaultDueDate?: string;
+  defaultCategory?: ProjectCategory | null;
   assignedDevelopers: DeveloperOption[];
   assignableDevelopers: DeveloperOption[];
   variant?: "card" | "inline";
@@ -47,6 +53,7 @@ export function ProjectControls({
   defaultStatus,
   defaultPriority,
   defaultDueDate = "",
+  defaultCategory = null,
   assignedDevelopers,
   assignableDevelopers,
   variant = "card",
@@ -188,6 +195,8 @@ export function ProjectControls({
               showSubmit={false}
               showDueDate
               defaultDueDate={defaultDueDate}
+              showCategory
+              defaultCategory={defaultCategory}
             />
             <Select value={selectedDev} onValueChange={setSelectedDev}>
               <SelectTrigger className="w-[180px]" size="sm">

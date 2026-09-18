@@ -5,7 +5,11 @@ import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { ProjectPriority, ProjectStatus } from "@prisma/client";
+import {
+  ProjectCategory,
+  ProjectPriority,
+  ProjectStatus,
+} from "@prisma/client";
 
 import { updateProject } from "@/actions/projectActions";
 import { Button } from "@/components/ui/button";
@@ -21,13 +25,21 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useStatusChangeGuard } from "@/components/use-status-change";
-import { getPriorityLabel, getStatusLabel } from "@/lib/projectLabels";
+import {
+  categoryLabels,
+  getPriorityLabel,
+  getStatusLabel,
+} from "@/lib/projectLabels";
 
 const schema = z.object({
   status: z.nativeEnum(ProjectStatus),
   priority: z.nativeEnum(ProjectPriority),
   dueDate: z.string().optional(),
+  category: z.string().optional(),
 });
+
+// Value of the category select that means "no category".
+const NO_CATEGORY = "none";
 
 type FormValues = z.infer<typeof schema>;
 
@@ -39,6 +51,9 @@ type ProjectUpdateFormProps = {
   // opt-in: leaving it out never touches the stored date.
   showDueDate?: boolean;
   defaultDueDate?: string;
+  // Same opt-in for the kind of demand (managers only).
+  showCategory?: boolean;
+  defaultCategory?: ProjectCategory | null;
   compact?: boolean;
   // grid/inline: compact rows inside lists. stack: labelled fields for dialogs.
   layout?: "grid" | "inline" | "stack";
@@ -53,6 +68,8 @@ export function ProjectUpdateForm({
   defaultPriority,
   showDueDate = false,
   defaultDueDate = "",
+  showCategory = false,
+  defaultCategory = null,
   compact = false,
   layout = "grid",
   formId,
@@ -70,6 +87,7 @@ export function ProjectUpdateForm({
       status: defaultStatus,
       priority: defaultPriority,
       dueDate: defaultDueDate,
+      category: defaultCategory ?? NO_CATEGORY,
     },
   });
 
@@ -81,6 +99,14 @@ export function ProjectUpdateForm({
           status: values.status,
           priority: values.priority,
           ...(showDueDate ? { dueDate: values.dueDate || null } : {}),
+          ...(showCategory
+            ? {
+                category:
+                  values.category && values.category !== NO_CATEGORY
+                    ? (values.category as ProjectCategory)
+                    : null,
+              }
+            : {}),
           ...options,
         }),
       );
@@ -93,7 +119,9 @@ export function ProjectUpdateForm({
     ? "grid gap-4"
     : inline
       ? "flex-row items-center gap-2 shrink-0 whitespace-nowrap"
-      : showDueDate
+      : showDueDate && showCategory
+        ? "grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]"
+        : showDueDate
         ? "grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]"
         : compact
           ? "grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
@@ -151,6 +179,33 @@ export function ProjectUpdateForm({
     />
   );
 
+  const categorySelect = showCategory ? (
+    <Controller
+      control={control}
+      name="category"
+      render={({ field }) => (
+        <Select value={field.value} onValueChange={field.onChange}>
+          <SelectTrigger
+            id={stack ? "project-category" : undefined}
+            aria-label="Categoria"
+            className={inline ? "w-[150px] shrink-0" : "w-full"}
+            size={stack ? "default" : "sm"}
+          >
+            <SelectValue placeholder="Categoria" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={NO_CATEGORY}>Sem categoria</SelectItem>
+            {Object.values(ProjectCategory).map((category) => (
+              <SelectItem key={category} value={category}>
+                {categoryLabels[category]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+    />
+  ) : null;
+
   const dueInput = showDueDate ? (
     <Input
       id={stack ? "project-due" : undefined}
@@ -185,6 +240,12 @@ export function ProjectUpdateForm({
               <Label htmlFor="project-priority">Prioridade</Label>
               {prioritySelect}
             </div>
+            {categorySelect ? (
+              <div className="grid gap-1.5">
+                <Label htmlFor="project-category">Categoria</Label>
+                {categorySelect}
+              </div>
+            ) : null}
             {dueInput ? (
               <div className="grid gap-1.5">
                 <Label htmlFor="project-due">Previsão de entrega</Label>
@@ -200,6 +261,7 @@ export function ProjectUpdateForm({
           <>
             {statusSelect}
             {prioritySelect}
+            {categorySelect}
             {dueInput}
             {submit}
           </>

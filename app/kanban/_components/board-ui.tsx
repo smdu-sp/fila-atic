@@ -10,6 +10,8 @@ import {
   ChevronUp,
   ChevronsUp,
   Equal,
+  MessageSquare,
+  Paperclip,
   Plus,
   User,
   type LucideIcon,
@@ -99,7 +101,7 @@ function UnassignedAvatar() {
 
 type DropHandlers = {
   onDragOver: (event: DragEvent) => void;
-  onDragLeave: () => void;
+  onDragLeave: (event: DragEvent) => void;
   onDrop: (event: DragEvent) => void;
 };
 
@@ -111,6 +113,7 @@ export function BoardColumn({
   drop,
   onAdd,
   addLabel = "Criar tarefa",
+  dropAtEnd = false,
   children,
 }: {
   title: string;
@@ -120,6 +123,8 @@ export function BoardColumn({
   drop?: DropHandlers;
   onAdd?: () => void;
   addLabel?: string;
+  // Shows where a dragged card will land when dropped after the last one.
+  dropAtEnd?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -157,6 +162,7 @@ export function BoardColumn({
         )}
       >
         {children}
+        {dropAtEnd && count > 0 ? <DropLine /> : null}
         {count === 0 ? (
           <p className="select-none px-2 py-6 text-center text-xs text-muted-foreground/70">
             {drop ? "Arraste um item para cá" : "Nenhum item"}
@@ -176,6 +182,16 @@ export function BoardColumn({
         <div className="h-2" />
       )}
     </section>
+  );
+}
+
+// Marks the place a dragged card will take.
+export function DropLine() {
+  return (
+    <div
+      aria-hidden="true"
+      className="-my-1 h-1 shrink-0 rounded-full bg-primary"
+    />
   );
 }
 
@@ -257,24 +273,39 @@ export function ProjectCard({
   );
 }
 
+const VISIBLE_LABELS = 3;
+
 export function TaskCard({
   title,
   createdAt,
   assigneeName,
+  priority,
+  labels,
+  commentCount,
+  attachmentCount,
   projectTitle,
   dueDate,
   closed,
   draggable,
   dragging,
+  dropBefore = false,
   onDragStart,
   onDragEnd,
+  onDragOver,
   onOpen,
 }: CardDragProps & {
   title: string;
   createdAt: string | Date;
   assigneeName: string | null;
+  priority: ProjectPriority;
+  labels: string[];
+  commentCount: number;
+  attachmentCount: number;
   dueDate: Date | string | null;
   closed: boolean;
+  // A dragged card is about to be dropped in front of this one.
+  dropBefore?: boolean;
+  onDragOver?: (event: DragEvent) => void;
   // Shown when tasks from several projects share the board ("my tasks").
   projectTitle?: string;
   onOpen: () => void;
@@ -287,49 +318,98 @@ export function TaskCard({
   };
 
   return (
-    <article
-      role="button"
-      tabIndex={0}
-      draggable={draggable}
-      onClick={onOpen}
-      onKeyDown={handleKeyDown}
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
-      className={cn(
-        cardClassName,
-        "cursor-pointer",
-        draggable && "active:cursor-grabbing",
-        dragging && "rotate-1 opacity-40",
-      )}
-    >
-      <p className="line-clamp-3 font-medium leading-snug">{title}</p>
-      {projectTitle ? (
-        <p className="mt-1 truncate text-[11px] text-muted-foreground">
-          {projectTitle}
-        </p>
-      ) : null}
-      <div className="mt-3 flex items-center justify-between gap-2">
-        <span className="flex items-center gap-2">
-          <span
-            title="Tarefa"
-            className="flex size-4 shrink-0 items-center justify-center rounded-[3px] bg-emerald-600 text-white"
-          >
-            <CheckSquare className="size-2.5" />
-          </span>
-          {dueDate ? (
-            <DueBadge dueDate={dueDate} closed={closed} />
-          ) : (
-            <span className="text-xs text-muted-foreground">
-              {new Date(createdAt).toLocaleDateString("pt-BR", {
-                day: "2-digit",
-                month: "short",
-              })}
+    <>
+      {dropBefore ? <DropLine /> : null}
+      <article
+        role="button"
+        tabIndex={0}
+        draggable={draggable}
+        onClick={onOpen}
+        onKeyDown={handleKeyDown}
+        onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
+        onDragOver={onDragOver}
+        className={cn(
+          cardClassName,
+          "cursor-pointer",
+          draggable && "active:cursor-grabbing",
+          dragging && "rotate-1 opacity-40",
+        )}
+      >
+        <p className="line-clamp-3 font-medium leading-snug">{title}</p>
+        {projectTitle ? (
+          <p className="mt-1 truncate text-[11px] text-muted-foreground">
+            {projectTitle}
+          </p>
+        ) : null}
+        {labels.length ? (
+          <ul className="mt-2 flex flex-wrap gap-1" aria-label="Etiquetas">
+            {labels.slice(0, VISIBLE_LABELS).map((label) => (
+              <li
+                key={label}
+                className="max-w-full truncate rounded bg-secondary px-1.5 py-0.5 text-[11px] font-medium text-secondary-foreground"
+              >
+                {label}
+              </li>
+            ))}
+            {labels.length > VISIBLE_LABELS ? (
+              <li
+                title={labels.slice(VISIBLE_LABELS).join(", ")}
+                className="rounded bg-secondary px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground"
+              >
+                +{labels.length - VISIBLE_LABELS}
+              </li>
+            ) : null}
+          </ul>
+        ) : null}
+        <div className="mt-3 flex items-center justify-between gap-2">
+          <span className="flex items-center gap-2">
+            <span
+              title="Tarefa"
+              className="flex size-4 shrink-0 items-center justify-center rounded-[3px] bg-emerald-600 text-white"
+            >
+              <CheckSquare className="size-2.5" />
             </span>
-          )}
-        </span>
-        {assigneeName ? <UserAvatar name={assigneeName} /> : <UnassignedAvatar />}
-      </div>
-    </article>
+            {dueDate ? (
+              <DueBadge dueDate={dueDate} closed={closed} />
+            ) : (
+              <span className="text-xs text-muted-foreground">
+                {new Date(createdAt).toLocaleDateString("pt-BR", {
+                  day: "2-digit",
+                  month: "short",
+                })}
+              </span>
+            )}
+          </span>
+          <span className="flex shrink-0 items-center gap-2">
+            {commentCount > 0 ? (
+              <span
+                title={`${commentCount} comentário(s)`}
+                className="flex items-center gap-0.5 text-xs text-muted-foreground"
+              >
+                <MessageSquare className="size-3.5" />
+                {commentCount}
+              </span>
+            ) : null}
+            {attachmentCount > 0 ? (
+              <span
+                title={`${attachmentCount} anexo(s)`}
+                className="flex items-center gap-0.5 text-xs text-muted-foreground"
+              >
+                <Paperclip className="size-3.5" />
+                {attachmentCount}
+              </span>
+            ) : null}
+            <PriorityIcon priority={priority} />
+            {assigneeName ? (
+              <UserAvatar name={assigneeName} />
+            ) : (
+              <UnassignedAvatar />
+            )}
+          </span>
+        </div>
+      </article>
+    </>
   );
 }
 

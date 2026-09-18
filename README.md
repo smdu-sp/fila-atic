@@ -70,6 +70,7 @@ Cada pessoa com conta recebe avisos no sino da barra lateral (e na página `/not
 - tarefa atribuída e inclusão em um projeto (a pessoa atribuída);
 - mensagem nova: da equipe para o solicitante, e do solicitante (com conta ou convidado) para a equipe do projeto (ou para a coordenação, se ainda não há equipe);
 - mudança de status e de previsão de entrega (solicitante);
+- comentário novo em uma tarefa (responsável e quem já comentou);
 - prazos: tarefa ou projeto que vence amanhã, vence hoje ou acabou de atrasar.
 
 Quem causa o evento nunca é avisado dele. Convidados (formulário público) não têm conta: continuam recebendo os e-mails com o link de acompanhamento.
@@ -88,9 +89,17 @@ schtasks /create /tn "Fila ATIC - avisos de prazo" /sc daily /st 07:00 /tr "cmd 
 
 Rodar mais de uma vez no dia é seguro: cada aviso é entregue uma única vez. A mesma execução apaga notificações lidas há mais de 60 dias e qualquer uma com mais de 180. Sem o agendador, todos os outros avisos continuam funcionando; só os de prazo deixam de sair.
 
+## Tarefas e Kanban
+
+Clicar em uma tarefa abre o diálogo completo: título, descrição, status, prioridade, responsável, prazo, etiquetas (até 8), anexos e comentários. Só o responsável e a coordenação/DEV II alteram os dados; qualquer pessoa da equipe com acesso ao projeto comenta e anexa. Solicitantes nunca veem tarefas, comentários ou anexos de tarefa.
+
+Os cartões podem ser arrastados entre colunas e reordenados dentro delas (a posição é gravada; tarefas novas entram no topo). Na visão "Minhas tarefas" só a troca de coluna é possível. O quadro filtra por texto, responsável, prioridade e etiqueta.
+
+A coordenação também classifica cada solicitação em uma categoria (erro/correção, melhoria, sistema novo, suporte/dúvida, outro), filtrável em `/fila` e `/projetos`.
+
 ## Anexos
 
-Os anexos das mensagens ficam em `storage/uploads/` (fora de `public/`, ignorado pelo git) e são servidos por `/uploads/[name]`, que exige sessão e acesso ao chamado. Limites: 3 arquivos por mensagem, 10 MB cada, apenas tipos de documento e imagem (ver `lib/uploads.ts`). Em produção, faça backup desse diretório junto com o banco.
+Os anexos das mensagens e das tarefas ficam em `storage/uploads/` (fora de `public/`, ignorado pelo git) e são servidos por `/uploads/[name]`, que exige sessão e acesso ao chamado; arquivos de tarefa são trabalho interno e nunca são entregues a solicitantes. Limites: 3 arquivos por envio, 10 MB cada, apenas tipos de documento e imagem (ver `lib/uploads.ts`). O limite de corpo da requisição (`next.config.ts`) precisa acompanhar esses números: o proxy do Next corta em 10 MB por padrão. Em produção, faça backup desse diretório junto com o banco.
 
 ## Scripts
 

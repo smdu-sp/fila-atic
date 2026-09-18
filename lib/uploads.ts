@@ -2,13 +2,14 @@ import { randomUUID } from "crypto";
 import { promises as fs } from "fs";
 import path from "path";
 
+import { MAX_UPLOAD_FILES, MAX_UPLOAD_SIZE } from "@/lib/uploadLimits";
+
 // Files live outside /public and are served by app/uploads/[name]/route.ts,
 // which checks the session and project access before streaming them.
 export const UPLOAD_DIR = path.join(process.cwd(), "storage", "uploads");
 export const UPLOAD_URL_PREFIX = "/uploads/";
 
-export const MAX_UPLOAD_FILES = 3;
-export const MAX_UPLOAD_SIZE = 10 * 1024 * 1024;
+export { MAX_UPLOAD_FILES, MAX_UPLOAD_SIZE };
 
 const ALLOWED_TYPES: Record<string, string> = {
   ".pdf": "application/pdf",

@@ -3,13 +3,18 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ProjectStatus, Role, TaskStatus } from "@prisma/client";
+import {
+  ProjectStatus,
+  Role,
+  TaskStatus,
+  type ProjectPriority,
+} from "@prisma/client";
 import { toast } from "sonner";
 
 import { updateProject } from "@/actions/projectActions";
 import { updateProjectStatusRestricted } from "@/actions/solicitacaoActions";
 import { CreateTaskForm } from "@/app/kanban/_components/create-task-form";
-import { UserAvatar } from "@/app/kanban/_components/board-ui";
+import { PriorityIcon, UserAvatar } from "@/app/kanban/_components/board-ui";
 import { DueBadge } from "@/components/due-badge";
 import { TaskProgress } from "@/components/task-progress";
 import { useStatusChangeGuard } from "@/components/use-status-change";
@@ -35,6 +40,8 @@ type PanelTask = {
   id: string;
   title: string;
   status: TaskStatus;
+  priority: ProjectPriority;
+  labels: string[];
   assigneeName: string | null;
   dueDate: Date | null;
 };
@@ -125,8 +132,7 @@ export function ProjectTasksPanel({
         {allDone ? (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100">
             <span>
-              Todas as tarefas foram concluídas. Já dá para finalizar o
-              projeto?
+              Todas as tarefas foram concluídas. Já dá para finalizar o projeto?
             </span>
             <Button size="sm" onClick={finishProject} disabled={isPending}>
               Finalizar projeto
@@ -141,14 +147,26 @@ export function ProjectTasksPanel({
                 key={task.id}
                 className="flex items-center justify-between gap-3 rounded-lg border border-border/60 px-3 py-2"
               >
-                <span
-                  className={
-                    task.status === TaskStatus.CANCELED
-                      ? "truncate text-muted-foreground line-through"
-                      : "truncate"
-                  }
-                >
-                  {task.title}
+                <span className="flex min-w-0 items-center gap-2">
+                  <PriorityIcon priority={task.priority} />
+                  <span
+                    className={
+                      task.status === TaskStatus.CANCELED
+                        ? "truncate text-muted-foreground line-through"
+                        : "truncate"
+                    }
+                  >
+                    {task.title}
+                  </span>
+                  {task.labels.map((label) => (
+                    <Badge
+                      key={label}
+                      variant="secondary"
+                      className="hidden shrink-0 sm:inline-flex"
+                    >
+                      {label}
+                    </Badge>
+                  ))}
                 </span>
                 <span className="flex shrink-0 items-center gap-2">
                   <DueBadge
@@ -164,9 +182,7 @@ export function ProjectTasksPanel({
             ))}
           </ul>
         ) : (
-          <p className="text-muted-foreground">
-            Nenhuma tarefa criada ainda.
-          </p>
+          <p className="text-muted-foreground">Nenhuma tarefa criada ainda.</p>
         )}
       </CardContent>
 

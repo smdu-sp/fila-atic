@@ -5,11 +5,12 @@ import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { TaskStatus } from "@prisma/client";
+import { ProjectPriority, TaskStatus } from "@prisma/client";
 
 import { createTask } from "@/actions/taskActions";
 import { AssigneeItems } from "@/app/kanban/_components/assignee-items";
 import { Button } from "@/components/ui/button";
+import { LabelsInput } from "@/components/labels-input";
 import { DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Form } from "@/components/ui/form";
@@ -21,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { getPriorityLabel } from "@/lib/projectLabels";
 
 type ProjectOption = { id: string; title: string };
 
@@ -31,6 +33,8 @@ const schema = z.object({
   status: z.nativeEnum(TaskStatus).optional(),
   assigneeId: z.string().optional(),
   dueDate: z.string().optional(),
+  priority: z.nativeEnum(ProjectPriority),
+  labels: z.array(z.string()),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -67,6 +71,8 @@ export function CreateTaskForm({
         status: initialStatus,
         assigneeId: "",
         dueDate: "",
+        priority: ProjectPriority.MEDIUM,
+        labels: [],
       },
     });
 
@@ -79,6 +85,8 @@ export function CreateTaskForm({
         status: initialStatus,
         assigneeId: "",
         dueDate: "",
+        priority: ProjectPriority.MEDIUM,
+        labels: [],
       });
     }
   }, [initialProjectId, initialStatus, reset]);
@@ -92,6 +100,8 @@ export function CreateTaskForm({
         status: values.status,
         assigneeId: values.assigneeId || null,
         dueDate: values.dueDate || null,
+        priority: values.priority,
+        labels: values.labels,
       });
 
       if (!result.success) {
@@ -107,6 +117,8 @@ export function CreateTaskForm({
         status: values.status,
         assigneeId: "",
         dueDate: "",
+        priority: ProjectPriority.MEDIUM,
+        labels: [],
       });
       onCreated?.();
     });
@@ -191,6 +203,43 @@ export function CreateTaskForm({
         <div className="grid gap-1.5">
           <Label htmlFor="task-due">Prazo (opcional)</Label>
           <Input id="task-due" type="date" {...register("dueDate")} />
+        </div>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-1.5">
+          <Label htmlFor="task-priority">Prioridade</Label>
+          <Controller
+            control={control}
+            name="priority"
+            render={({ field }) => (
+              <Select value={field.value} onValueChange={field.onChange}>
+                <SelectTrigger id="task-priority" className="w-full">
+                  <SelectValue placeholder="Prioridade" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.values(ProjectPriority).map((priority) => (
+                    <SelectItem key={priority} value={priority}>
+                      {getPriorityLabel(priority)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
+        </div>
+        <div className="grid gap-1.5">
+          <Label htmlFor="task-labels">Etiquetas (opcional)</Label>
+          <Controller
+            control={control}
+            name="labels"
+            render={({ field }) => (
+              <LabelsInput
+                id="task-labels"
+                value={field.value}
+                onChange={field.onChange}
+              />
+            )}
+          />
         </div>
       </div>
       <DialogFooter>

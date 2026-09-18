@@ -8,7 +8,12 @@ import {
   useTransition,
   type DragEvent,
 } from "react";
-import { ProjectPriority, ProjectStatus, Role, TaskStatus } from "@prisma/client";
+import {
+  ProjectPriority,
+  ProjectStatus,
+  Role,
+  TaskStatus,
+} from "@prisma/client";
 import { Pencil, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 
@@ -17,7 +22,7 @@ import { updateProjectStatusRestricted } from "@/actions/solicitacaoActions";
 import {
   listMyTasks,
   listTasksByProject,
-  updateTask,
+  moveTask as moveTaskOnServer,
 } from "@/actions/taskActions";
 import { updateTaskStatusLabels } from "@/actions/taskStatusActions";
 import {
@@ -27,14 +32,14 @@ import {
   TaskCard,
   UserAvatar,
 } from "@/app/kanban/_components/board-ui";
-import {
-  AssigneeItems,
-  NO_ASSIGNEE,
-} from "@/app/kanban/_components/assignee-items";
 import { CreateTaskForm } from "@/app/kanban/_components/create-task-form";
+import { TaskDialog } from "@/app/kanban/_components/task-dialog";
+import {
+  compareTasks,
+  type TaskItem,
+} from "@/app/kanban/_components/task-types";
 import { TaskProgress } from "@/components/task-progress";
 import { useStatusChangeGuard } from "@/components/use-status-change";
-import { toDateInput } from "@/lib/dueDate";
 import { isTaskOpen, summarizeTasks } from "@/lib/taskStatus";
 import { Button } from "@/components/ui/button";
 import {
@@ -54,8 +59,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { getStatusLabel, getTaskStatusLabel } from "@/lib/projectLabels";
+import {
+  getPriorityLabel,
+  getStatusLabel,
+  getTaskStatusLabel,
+} from "@/lib/projectLabels";
 import { cn } from "@/lib/utils";
 
 type ProjectItem = {
@@ -69,20 +77,6 @@ type ProjectItem = {
   taskDone: number;
   developerIds: string[];
   dueDate: Date | null;
-};
-
-type TaskItem = {
-  id: string;
-  title: string;
-  description: string | null;
-  status: TaskStatus;
-  assigneeId: string | null;
-  assigneeName: string | null;
-  dueDate: Date | string | null;
-  createdAt: string | Date;
-  // only when tasks of several projects are listed together
-  projectId?: string;
-  projectTitle?: string;
 };
 
 type Assignee = { id: string; name: string };
@@ -122,6 +116,8 @@ const taskStatusOrder = taskColumns.map((column) => column.status);
 
 // Special value of the project picker: my tasks, from every project.
 const MINE = "__mine__";
+// Special value of the priority and label filters: no filter.
+const ALL = "__all__";
 
 export function KanbanView({
   projects,
@@ -155,13 +151,11 @@ export function KanbanView({
   const [createStatus, setCreateStatus] = useState<TaskStatus | undefined>();
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropStatus, setDropStatus] = useState<string | null>(null);
-  const [editOpen, setEditOpen] = useState(false);
-  const [editingTask, setEditingTask] = useState<TaskItem | null>(null);
-  const [editTitle, setEditTitle] = useState("");
-  const [editDescription, setEditDescription] = useState("");
-  const [editStatus, setEditStatus] = useState<TaskStatus>(TaskStatus.TODO);
-  const [editAssignee, setEditAssignee] = useState(NO_ASSIGNEE);
-  const [editDueDate, setEditDueDate] = useState("");
+  // Card the dragged one will be placed in front of; null means "at the end".
+  const [dropBeforeId, setDropBeforeId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [priorityFilter, setPriorityFilter] = useState<string>(ALL);
+  const [labelFilter, setLabelFilter] = useState<string>(ALL);
   const [statusEditOpen, setStatusEditOpen] = useState(false);
   const [statusDraft, setStatusDraft] =
     useState<Record<TaskStatus, string>>(taskStatusLabels);
@@ -193,7 +187,6 @@ export function KanbanView({
     projectItems.find((project) => project.id === projectId)?.developerIds ??
     [];
   const isManager = isCoordination(role) || role === Role.DEV_GLOBAL;
-  const canAssign = assignees.length > 0;
   const canMoveProjects = role !== Role.REQUESTER;
   const canMoveTask = (task: TaskItem) =>
     isManager || task.assigneeId === currentUserId;
@@ -221,17 +214,29 @@ export function KanbanView({
     () =>
       taskColumns.map((column) => ({
         ...column,
-        label: statusLabelsState[column.status] ?? getTaskStatusLabel(column.status),
-        items: tasks.filter(
-          (task) =>
-            task.status === column.status &&
-            (!assigneeFilter || task.assigneeId === assigneeFilter) &&
-            (!query ||
-              task.title.toLowerCase().includes(query) ||
-              (task.description ?? "").toLowerCase().includes(query)),
-        ),
+        label:
+          statusLabelsState[column.status] ?? getTaskStatusLabel(column.status),
+        items: tasks
+          .filter(
+            (task) =>
+              task.status === column.status &&
+              (!assigneeFilter || task.assigneeId === assigneeFilter) &&
+              (priorityFilter === ALL || task.priority === priorityFilter) &&
+              (labelFilter === ALL || task.labels.includes(labelFilter)) &&
+              (!query ||
+                task.title.toLowerCase().includes(query) ||
+                (task.description ?? "").toLowerCase().includes(query)),
+          )
+          .sort(compareTasks),
       })),
-    [tasks, statusLabelsState, assigneeFilter, query],
+    [
+      tasks,
+      statusLabelsState,
+      assigneeFilter,
+      priorityFilter,
+      labelFilter,
+      query,
+    ],
   );
 
   // People already working in this project's tasks, for the quick filter.
@@ -247,20 +252,15 @@ export function KanbanView({
     );
   }, [tasks]);
 
-  const editAssigneeOptions = useMemo(() => {
-    const options = [...assignees];
-    if (
-      editingTask?.assigneeId &&
-      editingTask.assigneeName &&
-      !options.some((option) => option.id === editingTask.assigneeId)
-    ) {
-      options.push({
-        id: editingTask.assigneeId,
-        name: editingTask.assigneeName,
-      });
-    }
-    return options;
-  }, [assignees, editingTask]);
+  const taskLabelOptions = useMemo(
+    () =>
+      Array.from(new Set(tasks.flatMap((task) => task.labels))).sort((a, b) =>
+        a.localeCompare(b),
+      ),
+    [tasks],
+  );
+
+  const editingTask = tasks.find((task) => task.id === editingId) ?? null;
 
   useEffect(() => {
     setProjectItems(projects);
@@ -290,6 +290,7 @@ export function KanbanView({
 
   useEffect(() => {
     setAssigneeFilter(null);
+    setLabelFilter(ALL);
   }, [selectedProjectId]);
 
   useEffect(() => {
@@ -317,6 +318,7 @@ export function KanbanView({
   const handleDragEnd = () => {
     setDraggingId(null);
     setDropStatus(null);
+    setDropBeforeId(null);
   };
 
   const dropHandlers = (status: string, onDropItem: (id: string) => void) => ({
@@ -325,7 +327,11 @@ export function KanbanView({
       event.dataTransfer.dropEffect = "move";
       if (dropStatus !== status) setDropStatus(status);
     },
-    onDragLeave: () => {
+    onDragLeave: (event: DragEvent) => {
+      // moving over a card inside the column is not leaving it
+      if (event.currentTarget.contains(event.relatedTarget as Node | null)) {
+        return;
+      }
       if (dropStatus === status) setDropStatus(null);
     },
     onDrop: (event: DragEvent) => {
@@ -339,21 +345,106 @@ export function KanbanView({
 
   // Cards move right away; the server is asked afterwards and the board is
   // reloaded from the truth if it refuses (e.g. missing permission).
-  const moveTask = (taskId: string, status: TaskStatus) => {
+  // beforeId: card to be placed in front of, null for the end of the column,
+  // undefined to keep the position (only the column changes).
+  const moveTask = (
+    taskId: string,
+    status: TaskStatus,
+    beforeId?: string | null,
+  ) => {
     const task = tasks.find((item) => item.id === taskId);
-    if (!task || task.status === status) return;
+    if (!task || beforeId === taskId) return;
+
+    let position = task.position;
+
+    if (beforeId === undefined) {
+      if (task.status === status) return;
+    } else {
+      const column = tasks
+        .filter((item) => item.status === status)
+        .sort(compareTasks);
+      const others = column.filter((item) => item.id !== taskId);
+      const index =
+        beforeId === null
+          ? others.length
+          : others.findIndex((item) => item.id === beforeId);
+      if (index === -1) return;
+
+      // dropped where it already is
+      if (task.status === status) {
+        const current = column.findIndex((item) => item.id === taskId);
+        if ((column[current + 1]?.id ?? null) === beforeId) return;
+      }
+
+      const previous = others[index - 1];
+      const next = others[index];
+      position =
+        previous && next
+          ? (previous.position + next.position) / 2
+          : next
+            ? next.position - 1
+            : previous
+              ? previous.position + 1
+              : 0;
+    }
 
     setTasks((prev) =>
-      prev.map((item) => (item.id === taskId ? { ...item, status } : item)),
+      prev.map((item) =>
+        item.id === taskId ? { ...item, status, position } : item,
+      ),
     );
 
     startTransition(async () => {
-      const result = await updateTask({ id: taskId, status });
+      const result = await moveTaskOnServer({
+        taskId,
+        status,
+        beforeTaskId: beforeId,
+      });
       if (!result.success) {
         toast.error(result.error);
         reloadTasks();
       }
     });
+  };
+
+  // Where a card dragged over another one would land: in front of it when the
+  // pointer is in its upper half, otherwise in front of the next card.
+  const cardDragOver =
+    (status: TaskStatus, items: TaskItem[], index: number) =>
+    (event: DragEvent) => {
+      if (isMine) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.dataTransfer.dropEffect = "move";
+
+      const rect = event.currentTarget.getBoundingClientRect();
+      const upper = event.clientY < rect.top + rect.height / 2;
+      const beforeId = upper ? items[index].id : (items[index + 1]?.id ?? null);
+
+      if (dropStatus !== status) setDropStatus(status);
+      if (dropBeforeId !== beforeId) setDropBeforeId(beforeId);
+    };
+
+  // Over the free space of a column (below the last card, or empty): the end.
+  const columnDragOver = (status: TaskStatus) => (event: DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    if (dropStatus !== status) setDropStatus(status);
+    if (isMine) return;
+
+    const cards = event.currentTarget.querySelectorAll("article");
+    const last = cards[cards.length - 1];
+    if (!last || event.clientY > last.getBoundingClientRect().bottom) {
+      if (dropBeforeId !== null) setDropBeforeId(null);
+    }
+  };
+
+  const dropTask = (status: TaskStatus) => (event: DragEvent) => {
+    event.preventDefault();
+    const id = event.dataTransfer.getData("text/plain");
+    const before = isMine ? undefined : dropBeforeId;
+    handleDragEnd();
+    if (id) moveTask(id, status, before);
   };
 
   const runProjectStatus = (
@@ -396,43 +487,6 @@ export function KanbanView({
         toast.error(result.error);
         setProjectItems(previous);
       }
-    });
-  };
-
-  const handleOpenEdit = (task: TaskItem) => {
-    setEditingTask(task);
-    setEditTitle(task.title);
-    setEditDescription(task.description ?? "");
-    setEditStatus(task.status);
-    setEditAssignee(task.assigneeId ?? NO_ASSIGNEE);
-    setEditDueDate(toDateInput(task.dueDate));
-    setEditOpen(true);
-  };
-
-  const handleSaveEdit = () => {
-    if (!editingTask) return;
-    const title = editTitle.trim();
-    if (!title) return;
-
-    startTransition(async () => {
-      const result = await updateTask({
-        id: editingTask.id,
-        title,
-        description: editDescription.trim() || null,
-        dueDate: editDueDate || null,
-        status: editStatus,
-        assigneeId: canAssign
-          ? editAssignee === NO_ASSIGNEE
-            ? null
-            : editAssignee
-          : undefined,
-      });
-      if (!result.success) {
-        toast.error(result.error);
-        return;
-      }
-      setEditOpen(false);
-      reloadTasks();
     });
   };
 
@@ -538,6 +592,40 @@ export function KanbanView({
 
         {activeTab === "tasks" ? (
           <div className="flex flex-wrap items-center gap-2">
+            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+              <SelectTrigger
+                className="w-40 bg-background"
+                aria-label="Filtrar por prioridade"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>Todas as prioridades</SelectItem>
+                {Object.values(ProjectPriority).map((priority) => (
+                  <SelectItem key={priority} value={priority}>
+                    {getPriorityLabel(priority)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {taskLabelOptions.length ? (
+              <Select value={labelFilter} onValueChange={setLabelFilter}>
+                <SelectTrigger
+                  className="w-40 bg-background"
+                  aria-label="Filtrar por etiqueta"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>Todas as etiquetas</SelectItem>
+                  {taskLabelOptions.map((label) => (
+                    <SelectItem key={label} value={label}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null}
             <Select
               value={selectedProjectId}
               onValueChange={(value) => setSelectedProjectId(value)}
@@ -647,28 +735,51 @@ export function KanbanView({
                 count={column.items.length}
                 dotClassName={column.dot}
                 isDropTarget={dropStatus === column.status}
-                drop={dropHandlers(column.status, (id) =>
-                  moveTask(id, column.status),
-                )}
-                onAdd={isMine ? undefined : () => handleOpenCreate(column.status)}
+                dropAtEnd={
+                  dropStatus === column.status &&
+                  dropBeforeId === null &&
+                  !isMine
+                }
+                drop={{
+                  ...dropHandlers(column.status, () => {}),
+                  onDragOver: columnDragOver(column.status),
+                  onDrop: dropTask(column.status),
+                }}
+                onAdd={
+                  isMine ? undefined : () => handleOpenCreate(column.status)
+                }
               >
                 {loadingTasks ? (
                   <CardSkeletons />
                 ) : (
-                  column.items.map((item) => (
+                  column.items.map((item, index) => (
                     <TaskCard
                       key={item.id}
                       title={item.title}
                       createdAt={item.createdAt}
                       assigneeName={item.assigneeName}
+                      priority={item.priority}
+                      labels={item.labels}
+                      commentCount={item.commentCount}
+                      attachmentCount={item.attachmentCount}
                       projectTitle={item.projectTitle}
                       dueDate={item.dueDate}
                       closed={!isTaskOpen(item.status)}
                       draggable={canMoveTask(item)}
                       dragging={draggingId === item.id}
+                      dropBefore={
+                        dropStatus === column.status &&
+                        dropBeforeId === item.id &&
+                        draggingId !== item.id
+                      }
                       onDragStart={handleDragStart(item.id)}
                       onDragEnd={handleDragEnd}
-                      onOpen={() => handleOpenEdit(item)}
+                      onDragOver={cardDragOver(
+                        column.status,
+                        column.items,
+                        index,
+                      )}
+                      onOpen={() => setEditingId(item.id)}
                     />
                   ))
                 )}
@@ -708,92 +819,21 @@ export function KanbanView({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Editar tarefa</DialogTitle>
-            <DialogDescription>
-              Atualize título, descrição, status, responsável e prazo.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4">
-            <div className="grid gap-1.5">
-              <Label htmlFor="edit-title">Título</Label>
-              <Input
-                id="edit-title"
-                value={editTitle}
-                onChange={(event) => setEditTitle(event.target.value)}
-                placeholder="Título da tarefa"
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="edit-description">Descrição</Label>
-              <Textarea
-                id="edit-description"
-                value={editDescription}
-                onChange={(event) => setEditDescription(event.target.value)}
-                placeholder="Descrição"
-              />
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-1.5">
-                <Label htmlFor="edit-status">Status</Label>
-                <Select
-                  value={editStatus}
-                  onValueChange={(value) => setEditStatus(value as TaskStatus)}
-                >
-                  <SelectTrigger id="edit-status" className="w-full">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {taskStatusOrder.map((status) => (
-                      <SelectItem key={status} value={status}>
-                        {statusLabelsState[status] ??
-                          getTaskStatusLabel(status)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="edit-due">Prazo</Label>
-                <Input
-                  id="edit-due"
-                  type="date"
-                  value={editDueDate}
-                  onChange={(event) => setEditDueDate(event.target.value)}
-                />
-              </div>
-            </div>
-            {canAssign ? (
-              <div className="grid gap-1.5">
-                <Label htmlFor="edit-assignee">Responsável</Label>
-                <Select value={editAssignee} onValueChange={setEditAssignee}>
-                  <SelectTrigger id="edit-assignee" className="w-full">
-                    <SelectValue placeholder="Sem responsável" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <AssigneeItems
-                      assignees={editAssigneeOptions}
-                      teamIds={teamIdsOf(
-                        editingTask?.projectId ?? selectedProjectId,
-                      )}
-                    />
-                  </SelectContent>
-                </Select>
-              </div>
-            ) : null}
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setEditOpen(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSaveEdit} disabled={isPending}>
-              {isPending ? "Salvando" : "Salvar"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <TaskDialog
+        task={editingTask}
+        open={editingTask !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditingId(null);
+        }}
+        statusOrder={taskStatusOrder}
+        statusLabels={statusLabelsState}
+        assignees={assignees}
+        teamIds={teamIdsOf(editingTask?.projectId ?? selectedProjectId)}
+        canEdit={editingTask ? canMoveTask(editingTask) : false}
+        isManager={isManager}
+        currentUserId={currentUserId}
+        onChanged={reloadTasks}
+      />
 
       <Dialog open={statusEditOpen} onOpenChange={setStatusEditOpen}>
         <DialogContent size="lg">

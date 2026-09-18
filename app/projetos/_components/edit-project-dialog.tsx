@@ -2,7 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { ProjectPriority, ProjectStatus } from "@prisma/client";
+import type {
+  ProjectCategory,
+  ProjectPriority,
+  ProjectStatus,
+} from "@prisma/client";
 import { Pencil } from "lucide-react";
 
 import { ProjectUpdateForm } from "@/components/project-update-form";
@@ -24,12 +28,14 @@ export function EditProjectDialog({
   status,
   priority,
   dueDate,
+  category,
 }: {
   projectId: string;
   title: string;
   status: ProjectStatus;
   priority: ProjectPriority;
   dueDate: string;
+  category: ProjectCategory | null;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -58,6 +64,8 @@ export function EditProjectDialog({
           defaultPriority={priority}
           showDueDate
           defaultDueDate={dueDate}
+          showCategory
+          defaultCategory={category}
           layout="stack"
           onSaved={() => {
             setOpen(false);

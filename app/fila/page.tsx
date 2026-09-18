@@ -1,4 +1,4 @@
-import { ProjectPriority } from "@prisma/client";
+import { ProjectCategory, ProjectPriority } from "@prisma/client";
 
 import { PageHeader } from "@/components/page-header";
 import { COORDINATION_ROLES } from "@/lib/roles";
@@ -28,6 +28,8 @@ import { requireRole } from "@/lib/auth";
 import { toDateInput } from "@/lib/dueDate";
 import { firstParam, oneOf, parsePage } from "@/lib/listParams";
 import {
+  categoryLabels,
+  getCategoryLabel,
   getPriorityLabel,
   getStatusBadgeClass,
   getStatusLabel,
@@ -64,6 +66,15 @@ const filterFields: FilterField[] = [
   },
   {
     type: "select",
+    name: "categoria",
+    label: "Categoria",
+    options: Object.values(ProjectCategory).map((value) => ({
+      value,
+      label: categoryLabels[value],
+    })),
+  },
+  {
+    type: "select",
     name: "ordem",
     label: "Ordem",
     allLabel: "Mais antigos primeiro",
@@ -85,11 +96,13 @@ export default async function FilaPage({
   const filters = {
     q: firstParam(raw.q),
     prioridade: oneOf(raw.prioridade, Object.values(ProjectPriority)),
+    categoria: oneOf(raw.categoria, Object.values(ProjectCategory)),
     ordem: oneOf(raw.ordem, SORTS),
   };
   const search: QueueSearch = {
     q: filters.q,
     priority: filters.prioridade,
+    category: filters.categoria,
     sort: filters.ordem,
     page: parsePage(raw.page),
   };
@@ -174,6 +187,11 @@ export default async function FilaPage({
                       <Badge variant={priorityVariant[item.priority]}>
                         {getPriorityLabel(item.priority)}
                       </Badge>
+                      {item.category ? (
+                        <Badge variant="outline">
+                          {getCategoryLabel(item.category)}
+                        </Badge>
+                      ) : null}
                       <Badge
                         variant="outline"
                         className={getStatusBadgeClass(item.status)}
@@ -186,6 +204,8 @@ export default async function FilaPage({
                         defaultPriority={item.priority}
                         showDueDate
                         defaultDueDate={toDateInput(item.dueDate)}
+                        showCategory
+                        defaultCategory={item.category}
                         compact
                       />
                     </div>

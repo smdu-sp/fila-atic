@@ -1,4 +1,9 @@
-import { ProjectPriority, ProjectStatus, Role } from "@prisma/client";
+import {
+  ProjectCategory,
+  ProjectPriority,
+  ProjectStatus,
+  Role,
+} from "@prisma/client";
 
 import { PageHeader } from "@/components/page-header";
 import { COORDINATION_ROLES, isCoordination } from "@/lib/roles";
@@ -31,6 +36,8 @@ import { getServerAuthSession, requireRole } from "@/lib/auth";
 import { toDateInput } from "@/lib/dueDate";
 import { firstParam, oneOf, parsePage } from "@/lib/listParams";
 import {
+  categoryLabels,
+  getCategoryLabel,
   getPriorityLabel,
   getStatusBadgeClass,
   getStatusLabel,
@@ -65,6 +72,7 @@ export default async function ProjetosPage({
     q: firstParam(raw.q),
     status: oneOf(raw.status, Object.values(ProjectStatus)),
     prioridade: oneOf(raw.prioridade, Object.values(ProjectPriority)),
+    categoria: oneOf(raw.categoria, Object.values(ProjectCategory)),
     dev: firstParam(raw.dev),
     atrasados: firstParam(raw.atrasados) === "1" ? "1" : undefined,
     ordem: oneOf(raw.ordem, SORTS),
@@ -73,6 +81,7 @@ export default async function ProjetosPage({
     q: filters.q,
     status: filters.status,
     priority: filters.prioridade,
+    category: filters.categoria,
     developerId: filters.dev,
     overdue: filters.atrasados === "1",
     sort: filters.ordem,
@@ -116,6 +125,15 @@ export default async function ProjetosPage({
       options: Object.values(ProjectPriority).map((value) => ({
         value,
         label: priorityLabels[value],
+      })),
+    },
+    {
+      type: "select",
+      name: "categoria",
+      label: "Categoria",
+      options: Object.values(ProjectCategory).map((value) => ({
+        value,
+        label: categoryLabels[value],
       })),
     },
     // restricted developers cannot list people, and only see their own anyway
@@ -228,6 +246,11 @@ export default async function ProjetosPage({
                         <Badge variant={priorityVariant[project.priority]}>
                           {getPriorityLabel(project.priority)}
                         </Badge>
+                        {project.category ? (
+                          <Badge variant="outline">
+                            {getCategoryLabel(project.category)}
+                          </Badge>
+                        ) : null}
                         {canManage ? (
                           <EditProjectDialog
                             projectId={project.id}
@@ -235,6 +258,7 @@ export default async function ProjetosPage({
                             status={project.status}
                             priority={project.priority}
                             dueDate={toDateInput(project.dueDate)}
+                            category={project.category}
                           />
                         ) : null}
                       </div>
