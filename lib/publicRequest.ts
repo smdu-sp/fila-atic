@@ -19,6 +19,13 @@ export const RATE_LIMITS = {
   // Caps the damage when X-Forwarded-For is spoofed (no trusted proxy).
   submitGlobal: { kind: "submit-global", limit: 200, windowMs: HOUR_MS },
   reply: { kind: "guest-reply", limit: 20, windowMs: HOUR_MS },
+  // cancel / reopen through the tracking link
+  lifecycle: { kind: "guest-lifecycle", limit: 10, windowMs: HOUR_MS },
+  // "send me my links again": e-mails go to whoever owns the mailbox, so the
+  // limits protect that person from being flooded
+  resendEmail: { kind: "resend-email", limit: 3, windowMs: HOUR_MS },
+  resendIp: { kind: "resend-ip", limit: 10, windowMs: HOUR_MS },
+  resendGlobal: { kind: "resend-global", limit: 100, windowMs: HOUR_MS },
 } as const;
 
 export function getAllowedEmailDomains() {

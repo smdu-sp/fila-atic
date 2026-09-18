@@ -35,12 +35,19 @@ import {
   todayInAppZone,
 } from "@/lib/dueDate";
 import { PAGE_SIZE, pageCount, type Page } from "@/lib/listParams";
+import { normalizeReason } from "@/lib/requestLifecycle";
 import { hasCustomValue } from "@/lib/requestForm";
 import { deleteUploads } from "@/lib/uploads";
 
 type ActionResult<T> =
   | { success: true; data: T }
-  | { success: false; error: string; openTasks?: OpenTask[] };
+  | {
+      success: false;
+      error: string;
+      openTasks?: OpenTask[];
+      // cancelling needs a written reason: ask for it and repeat the call
+      needsReason?: boolean;
+    };
 
 type CreateProjectInput = {
   title: string;
@@ -254,6 +261,22 @@ export async function updateProject(
   const newStatus =
     input.status && input.status !== current.status ? input.status : null;
 
+  // Cancelling needs a reason the requester can read; leaving "cancelled"
+  // (reopening) clears it. undefined = untouched.
+  let closeReason: string | null | undefined;
+  if (newStatus === ProjectStatus.CANCELED) {
+    closeReason = normalizeReason(input.closeReason);
+    if (!closeReason) {
+      return {
+        success: false,
+        error: "Informe o motivo do cancelamento",
+        needsReason: true,
+      };
+    }
+  } else if (newStatus && current.status === ProjectStatus.CANCELED) {
+    closeReason = null;
+  }
+
   const decision = newStatus
     ? await planTaskDecision(prisma, input.id, newStatus, input)
     : { ok: true as const, taskIdsToClose: [] };
@@ -273,6 +296,7 @@ export async function updateProject(
         priority: input.priority,
         status: input.status,
         dueDate: due.value,
+        closeReason,
       },
     });
 
@@ -296,6 +320,17 @@ export async function updateProject(
       });
     }
     await closeTasks(tx, input.id, decision.taskIdsToClose, auth.data.name);
+
+    if (newStatus === ProjectStatus.CANCELED && closeReason) {
+      await tx.projectLog.create({
+        data: {
+          projectId: input.id,
+          message: `Solicitação cancelada pela equipe. Motivo: ${closeReason}`,
+          authorName: auth.data.name,
+          isInternal: false,
+        },
+      });
+    }
   });
 
   if (input.status && input.status !== current.status) {
@@ -310,6 +345,7 @@ export async function updateProject(
       projectId: input.id,
       kind: "STATUS_CHANGED",
       title: `Status de "{projeto}": ${getStatusLabel(newStatus)}`,
+      body: closeReason ?? undefined,
       exceptUserId: auth.data.id,
     });
   }

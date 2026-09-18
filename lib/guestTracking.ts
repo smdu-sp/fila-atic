@@ -4,6 +4,7 @@ import {
   isValidTokenFormat,
 } from "@/lib/publicRequest";
 import { parseMultiValue } from "@/lib/requestForm";
+import { reopenUntilIfOpen } from "@/lib/requestLifecycle";
 
 // Read side of the public pages. The token is the only credential, so every
 // query starts from it and nothing else about the project is looked up by id.
@@ -35,6 +36,8 @@ export async function getTrackedProject(token: string) {
       priority: true,
       createdAt: true,
       dueDate: true,
+      closeReason: true,
+      updatedAt: true,
       requester: { select: { name: true } },
       requestValues: {
         select: {
@@ -85,6 +88,12 @@ export async function getTrackedProject(token: string) {
     priority: project.priority,
     createdAt: project.createdAt,
     dueDate: project.dueDate,
+    closeReason: project.closeReason,
+    reopenUntil: await reopenUntilIfOpen(
+      project.id,
+      project.status,
+      project.updatedAt,
+    ),
     requesterName: project.requester.name,
     customFields,
     messages: project.logs,

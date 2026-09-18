@@ -135,9 +135,10 @@ describe("finishing or cancelling a project with open tasks", () => {
     const done = await makeTask(project.id, { title: "Feita", status: TaskStatus.DONE });
     actAs(coord);
 
-    expect(await updateProject({ id: project.id, status: ProjectStatus.CANCELED })).toMatchObject({ success: false });
+    const reason = "Escopo mudou, nao vamos mais fazer";
+    expect(await updateProject({ id: project.id, status: ProjectStatus.CANCELED, closeReason: reason })).toMatchObject({ success: false });
 
-    expect(await updateProject({ id: project.id, status: ProjectStatus.CANCELED, closeOpenTasks: true })).toMatchObject({ success: true });
+    expect(await updateProject({ id: project.id, status: ProjectStatus.CANCELED, closeReason: reason, closeOpenTasks: true })).toMatchObject({ success: true });
     expect((await prisma.task.findUniqueOrThrow({ where: { id: open.id } })).status).toBe(TaskStatus.CANCELED);
     expect((await prisma.task.findUniqueOrThrow({ where: { id: done.id } })).status).toBe(TaskStatus.DONE);
     const logs = await prisma.projectLog.findMany({ where: { projectId: project.id } });
@@ -149,7 +150,7 @@ describe("finishing or cancelling a project with open tasks", () => {
     const open = await makeTask(project.id);
     actAs(coord);
 
-    expect(await updateProject({ id: project.id, status: ProjectStatus.CANCELED, confirmOpenTasks: true })).toMatchObject({ success: true });
+    expect(await updateProject({ id: project.id, status: ProjectStatus.CANCELED, closeReason: "Cancelado a pedido da area", confirmOpenTasks: true })).toMatchObject({ success: true });
     expect((await prisma.task.findUniqueOrThrow({ where: { id: open.id } })).status).toBe(TaskStatus.TODO);
   });
 

@@ -6,6 +6,7 @@ import {
   notifyUsers,
   projectTeamIds,
 } from "@/lib/notifications";
+import { removeExpiredPending } from "@/lib/pendingRequests";
 import { prisma } from "@/lib/prisma";
 import { CLOSED_TASK_STATUSES } from "@/lib/taskStatus";
 
@@ -103,6 +104,9 @@ export async function runDeadlineReminders(now: Date = new Date()) {
     },
   });
   counts.removed = removed.count;
+
+  // unconfirmed public requests, with their uploaded files
+  await removeExpiredPending(now);
 
   return counts;
 }

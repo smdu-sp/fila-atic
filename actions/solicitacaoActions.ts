@@ -19,11 +19,17 @@ import {
   type OpenTask,
   type StatusChangeOptions,
 } from "@/lib/projectStatus";
+import { normalizeReason, reopenUntilIfOpen } from "@/lib/requestLifecycle";
 import { saveUploads, validateUploads } from "@/lib/uploads";
 
 type ActionResult<T> =
   | { success: true; data: T }
-  | { success: false; error: string; openTasks?: OpenTask[] };
+  | {
+      success: false;
+      error: string;
+      openTasks?: OpenTask[];
+      needsReason?: boolean;
+    };
 
 type ProjectDetails = {
   id: string;
@@ -34,6 +40,9 @@ type ProjectDetails = {
   priority: ProjectPriority;
   createdAt: Date;
   dueDate: Date | null;
+  closeReason: string | null;
+  // until when the requester may reopen a closed request
+  reopenUntil: Date | null;
   requester: {
     name: string;
     email: string;
@@ -122,6 +131,8 @@ export async function getProjectDetails(
       priority: true,
       createdAt: true,
       dueDate: true,
+      closeReason: true,
+      updatedAt: true,
       requesterId: true,
       requester: {
         select: { name: true, email: true, department: true },
@@ -183,6 +194,12 @@ export async function getProjectDetails(
       priority: project.priority,
       createdAt: project.createdAt,
       dueDate: project.dueDate,
+      closeReason: project.closeReason,
+      reopenUntil: await reopenUntilIfOpen(
+        project.id,
+        project.status,
+        project.updatedAt,
+      ),
       requester: {
         name: project.requester.name,
         email: project.requester.email,
@@ -355,6 +372,21 @@ export async function updateProjectStatusRestricted(
   }
 
   const changed = status !== current.status;
+
+  let closeReason: string | null | undefined;
+  if (changed && status === ProjectStatus.CANCELED) {
+    closeReason = normalizeReason(options.closeReason);
+    if (!closeReason) {
+      return {
+        success: false,
+        error: "Informe o motivo do cancelamento",
+        needsReason: true,
+      };
+    }
+  } else if (changed && current.status === ProjectStatus.CANCELED) {
+    closeReason = null;
+  }
+
   const decision = changed
     ? await planTaskDecision(prisma, projectId, status, options)
     : { ok: true as const, taskIdsToClose: [] };
@@ -363,7 +395,7 @@ export async function updateProjectStatusRestricted(
   await prisma.$transaction(async (tx) => {
     await tx.project.update({
       where: { id: projectId },
-      data: { status },
+      data: { status, closeReason },
     });
 
     if (changed) {
@@ -375,6 +407,17 @@ export async function updateProjectStatusRestricted(
       });
     }
     await closeTasks(tx, projectId, decision.taskIdsToClose, auth.data.name);
+
+    if (closeReason) {
+      await tx.projectLog.create({
+        data: {
+          projectId,
+          message: `Solicitação cancelada pela equipe. Motivo: ${closeReason}`,
+          authorName: auth.data.name,
+          isInternal: false,
+        },
+      });
+    }
 
     await tx.projectLog.create({
       data: {
@@ -395,6 +438,7 @@ export async function updateProjectStatusRestricted(
       projectId,
       kind: "STATUS_CHANGED",
       title: `Status de "{projeto}": ${getStatusLabel(status)}`,
+      body: closeReason ?? undefined,
       exceptUserId: auth.data.id,
     });
   }

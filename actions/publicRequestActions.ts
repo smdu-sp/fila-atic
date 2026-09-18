@@ -5,7 +5,11 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { prisma } from "@/lib/prisma";
-import { sendConfirmationEmail, sendTrackingEmail } from "@/lib/guestMail";
+import {
+  sendConfirmationEmail,
+  sendTrackingEmail,
+  sendTrackingLinksEmail,
+} from "@/lib/guestMail";
 import {
   CONFIRM_TOKEN_TTL_MS,
   consumeAttempt,
@@ -32,7 +36,17 @@ import {
   notifyTeamOfRequesterMessage,
 } from "@/lib/notifications";
 import { recordStatusChange } from "@/lib/projectStatus";
-import { saveUploads, validateUploads } from "@/lib/uploads";
+import {
+  normalizeReason,
+  REASON_ERROR,
+  requesterCancels,
+  requesterReopens,
+} from "@/lib/requestLifecycle";
+import {
+  removeExpiredPending,
+  type SavedFile,
+} from "@/lib/pendingRequests";
+import { deleteUploads, saveUploads, validateUploads } from "@/lib/uploads";
 
 // Everything here is callable without a session, so each action validates its
 // own input and trusts nothing but the confirmation/tracking token.
@@ -106,6 +120,31 @@ function validateCustomFields(
 export async function submitPublicRequest(
   input: PublicRequestInput,
 ): Promise<ActionResult<{ email: string }>> {
+  return submitCore(input, []);
+}
+
+// Same as above, with files: the form sends the fields as JSON in "payload".
+export async function submitPublicRequestForm(
+  formData: FormData,
+): Promise<ActionResult<{ email: string }>> {
+  let input: PublicRequestInput;
+  try {
+    input = JSON.parse(String(formData.get("payload") ?? ""));
+  } catch {
+    return { success: false, error: "Dados invalidos" };
+  }
+
+  const files = formData
+    .getAll("attachments")
+    .filter((file): file is File => file instanceof File && file.size > 0);
+
+  return submitCore(input, files);
+}
+
+async function submitCore(
+  input: PublicRequestInput,
+  files: File[],
+): Promise<ActionResult<{ email: string }>> {
   if (!isPublicRequestEnabled()) {
     return { success: false, error: "Solicitacao publica indisponivel" };
   }
@@ -139,6 +178,9 @@ export async function submitPublicRequest(
   const custom = validateCustomFields(fields, data.customFields ?? {});
   if (!custom.success) return custom;
 
+  const uploadError = validateUploads(files);
+  if (uploadError) return { success: false, error: uploadError };
+
   const allowed =
     (await consumeAttempt(RATE_LIMITS.submitGlobal, "all")) &&
     (await consumeAttempt(RATE_LIMITS.submitIp, await getClientKey())) &&
@@ -152,9 +194,7 @@ export async function submitPublicRequest(
   }
 
   const now = new Date();
-  await prisma.pendingGuestRequest.deleteMany({
-    where: { expiresAt: { lt: now } },
-  });
+  await removeExpiredPending(now);
 
   const waiting = await prisma.pendingGuestRequest.count({
     where: { email: data.email, expiresAt: { gte: now } },
@@ -167,6 +207,7 @@ export async function submitPublicRequest(
     };
   }
 
+  const saved: SavedFile[] = await saveUploads(files);
   const token = generateToken();
   const pending = await prisma.pendingGuestRequest.create({
     data: {
@@ -180,6 +221,7 @@ export async function submitPublicRequest(
       customFields: Object.keys(custom.data).length
         ? JSON.stringify(custom.data)
         : null,
+      attachments: saved.length ? JSON.stringify(saved) : null,
       expiresAt: new Date(now.getTime() + CONFIRM_TOKEN_TTL_MS),
     },
     select: { id: true },
@@ -195,6 +237,7 @@ export async function submitPublicRequest(
   } catch (error) {
     console.error("Falha ao enviar e-mail de confirmacao", error);
     await prisma.pendingGuestRequest.delete({ where: { id: pending.id } });
+    await deleteUploads(saved.map((file) => file.fileUrl));
     return {
       success: false,
       error:
@@ -323,6 +366,21 @@ export async function confirmPublicRequest(
       },
     });
 
+    const files: SavedFile[] = pending.attachments
+      ? JSON.parse(pending.attachments)
+      : [];
+    if (files.length) {
+      await tx.projectLog.create({
+        data: {
+          projectId: project.id,
+          message: "Anexos enviados na abertura da solicitação.",
+          authorName: pending.name,
+          isInternal: false,
+          attachments: { create: files },
+        },
+      });
+    }
+
     return project;
   });
 
@@ -428,6 +486,136 @@ export async function createGuestMessage(
   revalidatePath(`/acompanhar/${token}`);
   revalidatePath(`/solicitacoes/${project.id}`);
   revalidatePath("/logs");
+
+  return { success: true, data: undefined };
+}
+
+async function guestProject(token: string) {
+  if (!isValidTokenFormat(token)) return null;
+
+  return prisma.project.findUnique({
+    where: { trackingToken: token },
+    select: { id: true, requester: { select: { name: true } } },
+  });
+}
+
+function refreshGuestPages(token: string, projectId: string) {
+  revalidatePath(`/acompanhar/${token}`);
+  revalidatePath(`/solicitacoes/${projectId}`);
+  revalidatePath("/fila");
+  revalidatePath("/projetos");
+  revalidatePath("/kanban");
+  revalidatePath("/logs");
+}
+
+export async function cancelGuestRequest(
+  token: string,
+  reason: string,
+): Promise<ActionResult<void>> {
+  const project = await guestProject(token);
+  if (!project) return { success: false, error: "Solicitacao nao encontrada" };
+
+  const clean = normalizeReason(reason);
+  if (!clean) return { success: false, error: REASON_ERROR };
+
+  if (!(await consumeAttempt(RATE_LIMITS.lifecycle, project.id))) {
+    return { success: false, error: "Muitas tentativas. Tente novamente mais tarde." };
+  }
+
+  const result = await requesterCancels(
+    project.id,
+    { name: project.requester.name },
+    clean,
+  );
+  if (!result.success) return result;
+
+  refreshGuestPages(token, project.id);
+  return { success: true, data: undefined };
+}
+
+export async function reopenGuestRequest(
+  token: string,
+  reason: string,
+): Promise<ActionResult<void>> {
+  const project = await guestProject(token);
+  if (!project) return { success: false, error: "Solicitacao nao encontrada" };
+
+  const clean = normalizeReason(reason);
+  if (!clean) return { success: false, error: REASON_ERROR };
+
+  if (!(await consumeAttempt(RATE_LIMITS.lifecycle, project.id))) {
+    return { success: false, error: "Muitas tentativas. Tente novamente mais tarde." };
+  }
+
+  const result = await requesterReopens(
+    project.id,
+    { name: project.requester.name },
+    clean,
+  );
+  if (!result.success) return result;
+
+  refreshGuestPages(token, project.id);
+  return { success: true, data: undefined };
+}
+
+// "I lost my e-mail": sends the links of the requests opened with this
+// address. The answer is always the same, so nobody can use the form to find
+// out which addresses have requests.
+export async function resendTrackingLinks(
+  email: string,
+): Promise<ActionResult<void>> {
+  if (!isPublicRequestEnabled()) {
+    return { success: false, error: "Solicitacao publica indisponivel" };
+  }
+
+  const parsed = z.string().trim().toLowerCase().email().max(200).safeParse(email);
+  if (!parsed.success) return { success: false, error: "E-mail invalido" };
+  const address = parsed.data;
+
+  const allowed =
+    (await consumeAttempt(RATE_LIMITS.resendGlobal, "all")) &&
+    (await consumeAttempt(RATE_LIMITS.resendIp, await getClientKey())) &&
+    (await consumeAttempt(RATE_LIMITS.resendEmail, keyFor(address)));
+
+  if (!allowed) {
+    return { success: false, error: "Muitas tentativas. Tente novamente mais tarde." };
+  }
+
+  if (isAllowedEmail(address)) {
+    const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+    const projects = await prisma.project.findMany({
+      where: {
+        trackingToken: { not: null },
+        requester: { email: { equals: address, mode: "insensitive" } },
+        OR: [
+          { status: { notIn: [ProjectStatus.FINISHED, ProjectStatus.CANCELED] } },
+          { updatedAt: { gte: since } },
+        ],
+      },
+      select: {
+        title: true,
+        trackingToken: true,
+        requester: { select: { name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+    });
+
+    if (projects.length) {
+      try {
+        await sendTrackingLinksEmail({
+          to: address,
+          name: projects[0].requester.name,
+          projects: projects.map((project) => ({
+            title: project.title,
+            token: project.trackingToken as string,
+          })),
+        });
+      } catch (error) {
+        console.error("Falha ao reenviar links de acompanhamento", error);
+      }
+    }
+  }
 
   return { success: true, data: undefined };
 }

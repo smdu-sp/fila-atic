@@ -60,6 +60,33 @@ export async function sendTrackingEmail(input: {
   });
 }
 
+// Every open (or recently closed) request of one e-mail address, in a single
+// message, for people who lost the first e-mail.
+export async function sendTrackingLinksEmail(input: {
+  to: string;
+  name: string;
+  projects: Array<{ title: string; token: string }>;
+}) {
+  await sendMail({
+    to: input.to,
+    subject: "Seus links de acompanhamento - Fila ATIC",
+    text: [
+      `Olá, ${input.name}.`,
+      "",
+      "Você pediu os links das suas solicitações. Cada link é pessoal e dá acesso à solicitação; não o compartilhe.",
+      "",
+      ...input.projects.flatMap((project) => [
+        `• ${project.title}`,
+        `  ${trackingLink(project.token)}`,
+        "",
+      ]),
+      "Se você não fez este pedido, ignore esta mensagem.",
+      "",
+      SIGNATURE,
+    ].join("\n"),
+  });
+}
+
 // Tells a guest requester that something changed. Never throws: a mail
 // failure must not roll back or fail the staff action that triggered it. The
 // message carries no content, only the link, so the text cannot be spoofed

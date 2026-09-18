@@ -17,6 +17,8 @@ export type StatusChangeOptions = {
   confirmOpenTasks?: boolean;
   // Only when cancelling: cancel the open tasks together with the project.
   closeOpenTasks?: boolean;
+  // Required when cancelling: why. The requester reads it.
+  closeReason?: string;
 };
 
 export type OpenTasksFailure = {
