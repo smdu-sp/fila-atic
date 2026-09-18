@@ -23,7 +23,7 @@ export function LoginLogo() {
       <div>
         <p className="text-lg font-semibold">FilaAtic</p>
         <p className="text-xs text-muted-foreground">
-          Secretaria Municipal de Urbanismo
+          Secretaria Municipal de Urbanismo e Licenciamento - SMUL
         </p>
       </div>
     </div>
