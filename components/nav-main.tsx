@@ -1,11 +1,12 @@
 "use client";
 
-import { COORDINATION_ROLES } from "@/lib/roles";
+import { COORDINATION_ROLES, STAFF_ROLES } from "@/lib/roles";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import {
   BarChart3Icon,
+  BookOpenIcon,
   FileTextIcon,
   FolderIcon,
   LayoutIcon,
@@ -59,6 +60,12 @@ const menuGeral = [
     url: "/kanban",
     icon: LayoutIcon,
     roles: [Role.DEV_RESTRICTED, Role.DEV_GLOBAL, ...COORDINATION_ROLES],
+  },
+  {
+    title: "Caderno",
+    url: "/caderno",
+    icon: BookOpenIcon,
+    roles: STAFF_ROLES,
   },
 ];
 

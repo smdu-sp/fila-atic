@@ -3,6 +3,7 @@ import { Role } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canAccessProject } from "@/lib/projectAccess";
+import { isStaffRole } from "@/lib/roles";
 import { serveUpload, UPLOAD_URL_PREFIX } from "@/lib/uploads";
 
 export async function GET(
@@ -18,7 +19,8 @@ export async function GET(
 
   const fileUrl = `${UPLOAD_URL_PREFIX}${name}`;
   // Same answer for "missing" and "forbidden" so names are not probeable.
-  const notFound = () => new Response("Arquivo nao encontrado", { status: 404 });
+  const notFound = () =>
+    new Response("Arquivo nao encontrado", { status: 404 });
 
   // A file of a conversation message...
   const message = await prisma.projectLogAttachment.findFirst({
@@ -48,6 +50,16 @@ export async function GET(
     (await canAccessProject(user.id, user.role, task.task.projectId))
   ) {
     return serveUpload(name, task.fileName);
+  }
+
+  // ...or an image inserted in a wiki page (staff-only, not project-scoped).
+  const notebookImage = await prisma.notebookPageAttachment.findFirst({
+    where: { fileUrl },
+    select: { fileName: true },
+  });
+
+  if (notebookImage && isStaffRole(user.role)) {
+    return serveUpload(name, notebookImage.fileName);
   }
 
   return notFound();

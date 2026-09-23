@@ -287,3 +287,54 @@ model ProjectRequestFieldValue {
   project   Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
   field     ProjectRequestField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
 }
+
+// Internal wiki ("caderno"): a tree of pages, Markdown content. Never shown
+// to requesters. Deleting a page deletes its whole subtree (see
+// deleteNotebookPage, which also removes the files on disk first).
+model NotebookPage {
+  id            String                   @id @default(uuid())
+  title         String
+  content       String                   @db.Text
+  parentId      String?
+  parent        NotebookPage?            @relation("NotebookPageTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children      NotebookPage[]           @relation("NotebookPageTree")
+  // Order among siblings (same idea as Task.position): lower comes first.
+  position      Float                    @default(0)
+  createdById   String
+  createdByName String
+  updatedByName String
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+  revisions     NotebookPageRevision[]
+  attachments   NotebookPageAttachment[]
+
+  @@index([parentId])
+}
+
+// One row per save that changed title or content: a light audit trail, not
+// full version snapshots.
+model NotebookPageRevision {
+  id           String       @id @default(uuid())
+  pageId       String
+  page         NotebookPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  editedByName String
+  editedAt     DateTime     @default(now())
+
+  @@index([pageId, editedAt])
+}
+
+// Images inserted inline in a page's Markdown (![alt](fileUrl)).
+model NotebookPageAttachment {
+  id             String       @id @default(uuid())
+  pageId         String
+  page           NotebookPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  fileName       String
+  fileUrl        String
+  fileType       String?
+  fileSize       Int
+  uploadedById   String
+  uploadedByName String
+  createdAt      DateTime     @default(now())
+
+  @@index([pageId])
+}

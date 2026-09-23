@@ -23,3 +23,14 @@ export const isCoordination = (role: Role | null | undefined): boolean =>
 // Who may manage projects and tasks of any project: coordination and DEV II.
 export const isManagerRole = (role: Role | null | undefined): boolean =>
   isCoordination(role) || role === Role.DEV_GLOBAL;
+
+// Everyone who works here, as opposed to a requester (internal or public):
+// who may see and edit the internal wiki (the "caderno"), for instance.
+export const STAFF_ROLES: Role[] = [
+  Role.DEV_RESTRICTED,
+  Role.DEV_GLOBAL,
+  ...COORDINATION_ROLES,
+];
+
+export const isStaffRole = (role: Role | null | undefined): boolean =>
+  role != null && STAFF_ROLES.includes(role);

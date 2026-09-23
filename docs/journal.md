@@ -2,6 +2,17 @@
 
 Registro de decisões e entregas do projeto: o que foi pedido, o que foi feito e por quê. Não substitui o `git log` (que tem o detalhe técnico de cada commit) nem o `README.md` (que descreve o sistema como ele é hoje); serve para explicar o raciocínio por trás das mudanças, na ordem em que aconteceram. Entradas mais novas no topo.
 
+## 2026-09-23 (continuação) — Fase 8: caderno digital (wiki interna)
+
+Pedido: um "caderno digital estilo Notion" para templates, informações de servidores etc. Perguntei a profundidade antes de começar; a resposta foi "wiki simples" — páginas de texto rico organizadas em pastas, com histórico de quem editou. Ficou assim:
+
+- **Árvore de páginas**: `NotebookPage` com auto-relacionamento (`parentId`), qualquer página pode ter subpáginas, sem limite de profundidade. Nova posição de irmãos calculada como no Kanban (`position` fracionário); reordenar (`reorderNotebookPage`) já existe no backend, mas a interface de arrastar ficou fora desta primeira entrega — por enquanto uma página nova só entra no fim da lista de irmãos.
+- **Conteúdo em Markdown**, não um editor de blocos: mais simples de implementar e de guardar, e já cobre título/lista/link/imagem/negrito, que era o pedido. Renderizado com `react-markdown` + `remark-gfm` (tabelas, listas de tarefas) e `@tailwindcss/typography` para o visual, sem precisar estilizar elemento por elemento.
+- **Histórico leve**: `NotebookPageRevision` guarda quem editou e quando a cada mudança de título ou conteúdo — não guarda o conteúdo de cada versão (isso seria versionamento de verdade, escopo maior; se fizer falta, dá para evoluir depois).
+- **Imagens inline**: reaproveitam `lib/uploads.ts` e a rota `/uploads/[name]` (mesmo padrão de anexos de tarefa e de mensagem); a imagem enviada vira `![nome](url)` direto no texto, no cursor. Apagar uma página apaga o arquivo de toda imagem da subárvore inteira, não só dela.
+- **Permissão**: toda a equipe (coordenação, Tech Lead, DEV I, DEV II) lê e edita qualquer página — sem dono, de propósito, por ser um espaço coletivo. Solicitantes nunca veem `/caderno`. Novo helper `isStaffRole`/`STAFF_ROLES` em `lib/roles.ts` para esse padrão de permissão, que provavelmente vai reaparecer.
+- Testado com 10 testes de integração (permissão, árvore, revisões, prevenção de ciclo ao mover uma página para dentro dela mesma, reordenação, exclusão em cascata com limpeza de arquivo, upload/remoção de imagem com controle de acesso) e um smoke test no build de produção.
+
 ## 2026-09-23 — Relatórios, edição rápida no Kanban, correções de modal
 
 **Fase 6 do plano de gerenciador de projetos: relatórios.** A pedido, o escopo ficou em indicadores gerais (solicitações por status/prioridade/categoria, tempo médio por etapa, tarefas concluídas x em aberto) e desempenho por desenvolvedor (concluídas/em aberto/atrasadas), com filtro de período opcional — exportação em CSV foi deixada de fora por enquanto. Nova página `/relatorios` (coordenação e Tech Lead). O tempo por etapa usa o histórico de `ProjectStatusChange` e só conta etapas já concluídas dentro do período (a etapa atual de um projeto em andamento não entra na média, para não subestimar o tempo real). _(commit `74ec91c`)_

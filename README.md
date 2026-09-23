@@ -107,6 +107,10 @@ A coordenação também classifica cada solicitação em uma categoria (erro/cor
 
 `/relatorios` (coordenação e Tech Lead) mostra indicadores gerais e desempenho por desenvolvedor, com filtro opcional de período (data de/até). Contagens de solicitações (por status, prioridade e categoria) e o tempo médio por etapa usam a data em que a solicitação, ou a mudança de status, aconteceu dentro do período; tarefas em aberto e atrasadas por desenvolvedor são sempre a situação atual, independente do período escolhido. O tempo por etapa só considera etapas já concluídas (a etapa atual de um projeto em andamento não entra na média) e depende do histórico em `ProjectStatusChange`, existente a partir da migration `20260918180000_project_status_history_and_task_cancel`.
 
+## Caderno
+
+`/caderno` (qualquer pessoa da equipe: coordenação, Tech Lead, DEV I e DEV II — nunca solicitantes) é uma wiki interna simples: páginas em árvore (subpáginas dentro de páginas), conteúdo em Markdown (títulos, listas, links, **negrito**, imagens), pensada para templates, informações de servidores e outros registros do time. Qualquer pessoa da equipe cria, edita e apaga qualquer página — é um espaço coletivo, sem dono. Cada página guarda quem criou e quem editou por último, além de um histórico leve de edições (quem e quando, sem o conteúdo de cada versão). Apagar uma página apaga toda a subárvore dela, inclusive as imagens no disco. Imagens são inseridas direto no texto (`![nome](url)`) e servidas por `/uploads/[name]`, como os outros anexos do sistema.
+
 ## Anexos
 
 Os anexos das mensagens e das tarefas ficam em `storage/uploads/` (fora de `public/`, ignorado pelo git) e são servidos por `/uploads/[name]`, que exige sessão e acesso ao projeto; arquivos de tarefa são trabalho interno e nunca são entregues a solicitantes. Limites: 3 arquivos por envio, 10 MB cada, apenas tipos de documento e imagem (ver `lib/uploads.ts`). O limite de corpo da requisição (`next.config.ts`) precisa acompanhar esses números: o proxy do Next corta em 10 MB por padrão. Em produção, faça backup desse diretório junto com o banco.
