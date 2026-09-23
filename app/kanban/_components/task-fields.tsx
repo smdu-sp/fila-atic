@@ -81,8 +81,8 @@ export function TaskFormFields({
   const id = (name: string) => `${idPrefix}-${name}`;
 
   return (
-    <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_15rem]">
-      <div className="grid content-start gap-5">
+    <div className="grid min-w-0 gap-6 md:grid-cols-[minmax(0,1fr)_15rem]">
+      <div className="grid min-w-0 content-start gap-5">
         <div className="grid gap-1.5">
           <Label htmlFor={id("title")}>Título</Label>
           <Input
@@ -109,7 +109,10 @@ export function TaskFormFields({
         {mainAfter}
       </div>
 
-      <aside className="grid content-start gap-4" aria-label="Dados da tarefa">
+      <aside
+        className="grid min-w-0 content-start gap-4"
+        aria-label="Dados da tarefa"
+      >
         <div className="grid gap-1.5">
           <Label htmlFor={id("status")}>Status</Label>
           <Select

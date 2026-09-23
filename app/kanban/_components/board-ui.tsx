@@ -1,6 +1,14 @@
 "use client";
 
-import type { DragEvent, KeyboardEvent, ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+  type DragEvent,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 import Link from "next/link";
 import { ProjectPriority } from "@prisma/client";
 import {
@@ -16,11 +24,23 @@ import {
   User,
   type LucideIcon,
 } from "lucide-react";
+import { toast } from "sonner";
 
+import { updateTask } from "@/actions/taskActions";
+import {
+  AssigneeButtons,
+  NO_ASSIGNEE,
+} from "@/app/kanban/_components/assignee-items";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DueBadge } from "@/components/due-badge";
+import { LabelsInput } from "@/components/labels-input";
 import { TaskProgress } from "@/components/task-progress";
 import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { getPriorityLabel } from "@/lib/projectLabels";
 import { cn } from "@/lib/utils";
 
@@ -42,6 +62,61 @@ export function PriorityIcon({ priority }: { priority: ProjectPriority }) {
     <span title={label} aria-label={label} className={className}>
       <Icon className="size-4" strokeWidth={2.5} />
     </span>
+  );
+}
+
+// The priority icon as a button that opens a one-click picker, for the
+// Trello-style quick edits on a task card.
+function PriorityPicker({
+  priority,
+  onPick,
+  disabled,
+}: {
+  priority: ProjectPriority;
+  onPick: (value: ProjectPriority) => void;
+  disabled: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+
+  if (disabled) return <PriorityIcon priority={priority} />;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label="Alterar prioridade"
+          className="rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <PriorityIcon priority={priority} />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        className="w-44 p-1"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="grid gap-0.5">
+          {Object.values(ProjectPriority).map((value) => (
+            <button
+              key={value}
+              type="button"
+              className={cn(
+                "flex items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm hover:bg-accent hover:text-accent-foreground",
+                value === priority && "bg-accent text-accent-foreground",
+              )}
+              onClick={() => {
+                setOpen(false);
+                if (value !== priority) onPick(value);
+              }}
+            >
+              <PriorityIcon priority={value} />
+              {getPriorityLabel(value)}
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -96,6 +171,69 @@ function UnassignedAvatar() {
     >
       <User className="size-3.5" />
     </span>
+  );
+}
+
+// The responsible-person avatar as a button that opens a quick picker, for
+// the Trello-style quick edits on a task card. Only managers reassign (same
+// rule as the full task dialog); everyone else just sees who owns it.
+function AssigneePicker({
+  assigneeId,
+  assigneeName,
+  assignees,
+  teamIds,
+  canAssign,
+  onPick,
+}: {
+  assigneeId: string | null;
+  assigneeName: string | null;
+  assignees: Array<{ id: string; name: string }>;
+  teamIds: string[];
+  canAssign: boolean;
+  onPick: (id: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  if (!canAssign) {
+    return assigneeName ? (
+      <UserAvatar name={assigneeName} />
+    ) : (
+      <UnassignedAvatar />
+    );
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label="Alterar responsável"
+          className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          onClick={(event) => event.stopPropagation()}
+        >
+          {assigneeName ? (
+            <UserAvatar name={assigneeName} />
+          ) : (
+            <UnassignedAvatar />
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        className="w-56 p-1"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <AssigneeButtons
+          assignees={assignees}
+          teamIds={teamIds}
+          value={assigneeId ?? NO_ASSIGNEE}
+          onSelect={(value) => {
+            setOpen(false);
+            const id = value === NO_ASSIGNEE ? null : value;
+            if (id !== assigneeId) onPick(id);
+          }}
+        />
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -275,9 +413,73 @@ export function ProjectCard({
 
 const VISIBLE_LABELS = 3;
 
+// Etiquetas: read-only chips, or (when not disabled) a button that opens a
+// popover with the same LabelsInput used in the forms.
+function LabelsPicker({
+  labels,
+  onChange,
+  disabled,
+}: {
+  labels: string[];
+  onChange: (labels: string[]) => void;
+  disabled: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const chips = labels.length ? (
+    <ul className="flex flex-wrap gap-1" aria-label="Etiquetas">
+      {labels.slice(0, VISIBLE_LABELS).map((label) => (
+        <li
+          key={label}
+          className="max-w-full truncate rounded bg-secondary px-1.5 py-0.5 text-[11px] font-medium text-secondary-foreground"
+        >
+          {label}
+        </li>
+      ))}
+      {labels.length > VISIBLE_LABELS ? (
+        <li
+          title={labels.slice(VISIBLE_LABELS).join(", ")}
+          className="rounded bg-secondary px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground"
+        >
+          +{labels.length - VISIBLE_LABELS}
+        </li>
+      ) : null}
+    </ul>
+  ) : null;
+
+  if (disabled) return chips;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label="Editar etiquetas"
+          className="block w-full text-start"
+          onClick={(event) => event.stopPropagation()}
+        >
+          {chips ?? (
+            <span className="inline-flex rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground">
+              + etiqueta
+            </span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        className="w-64"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <LabelsInput value={labels} onChange={onChange} />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export function TaskCard({
+  id,
   title,
   createdAt,
+  assigneeId,
   assigneeName,
   priority,
   labels,
@@ -293,9 +495,16 @@ export function TaskCard({
   onDragEnd,
   onDragOver,
   onOpen,
+  editable = false,
+  canAssign = false,
+  assignees = [],
+  teamIds = [],
+  onChanged,
 }: CardDragProps & {
+  id: string;
   title: string;
   createdAt: string | Date;
+  assigneeId: string | null;
   assigneeName: string | null;
   priority: ProjectPriority;
   labels: string[];
@@ -309,7 +518,52 @@ export function TaskCard({
   // Shown when tasks from several projects share the board ("my tasks").
   projectTitle?: string;
   onOpen: () => void;
+  // Trello-style quick edits directly on the card: click the title, the
+  // priority icon, the labels or the avatar to change them right there,
+  // without opening the full dialog. Off by default; the same rule as the
+  // dialog decides who gets it (canMoveTask for editable, isManager for
+  // canAssign).
+  editable?: boolean;
+  canAssign?: boolean;
+  assignees?: Array<{ id: string; name: string }>;
+  teamIds?: string[];
+  // Called after a quick edit is saved, so the board reloads from the truth.
+  onChanged?: () => void;
 }) {
+  const [isPending, startTransition] = useTransition();
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState(title);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editingTitle) titleInputRef.current?.select();
+  }, [editingTitle]);
+
+  const save = (patch: Omit<Parameters<typeof updateTask>[0], "id">) =>
+    startTransition(async () => {
+      const result = await updateTask({ id, ...patch });
+      if (!result.success) {
+        toast.error(result.error);
+        return;
+      }
+      onChanged?.();
+    });
+
+  const startEditingTitle = () => {
+    setTitleDraft(title);
+    setEditingTitle(true);
+  };
+
+  const commitTitle = () => {
+    setEditingTitle(false);
+    const trimmed = titleDraft.trim();
+    if (!trimmed || trimmed === title) {
+      setTitleDraft(title);
+      return;
+    }
+    save({ title: trimmed });
+  };
+
   const handleKeyDown = (event: KeyboardEvent) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
@@ -323,7 +577,7 @@ export function TaskCard({
       <article
         role="button"
         tabIndex={0}
-        draggable={draggable}
+        draggable={draggable && !editingTitle}
         onClick={onOpen}
         onKeyDown={handleKeyDown}
         onDragStart={onDragStart}
@@ -334,33 +588,61 @@ export function TaskCard({
           "cursor-pointer",
           draggable && "active:cursor-grabbing",
           dragging && "rotate-1 opacity-40",
+          isPending && "opacity-70",
         )}
       >
-        <p className="line-clamp-3 font-medium leading-snug">{title}</p>
+        {editable && editingTitle ? (
+          <input
+            ref={titleInputRef}
+            autoFocus
+            value={titleDraft}
+            onChange={(event) => setTitleDraft(event.target.value)}
+            onBlur={commitTitle}
+            onClick={(event) => event.stopPropagation()}
+            onKeyDown={(event) => {
+              event.stopPropagation();
+              if (event.key === "Enter") {
+                event.preventDefault();
+                commitTitle();
+              } else if (event.key === "Escape") {
+                event.preventDefault();
+                setTitleDraft(title);
+                setEditingTitle(false);
+              }
+            }}
+            className="-m-0.5 w-[calc(100%+0.25rem)] rounded border border-ring bg-background p-0.5 font-medium leading-snug text-card-foreground outline-none"
+          />
+        ) : (
+          <p
+            className={cn(
+              "line-clamp-3 font-medium leading-snug",
+              editable && "-m-0.5 rounded p-0.5 hover:bg-accent",
+            )}
+            onClick={
+              editable
+                ? (event) => {
+                    event.stopPropagation();
+                    startEditingTitle();
+                  }
+                : undefined
+            }
+          >
+            {title}
+          </p>
+        )}
         {projectTitle ? (
           <p className="mt-1 truncate text-[11px] text-muted-foreground">
             {projectTitle}
           </p>
         ) : null}
-        {labels.length ? (
-          <ul className="mt-2 flex flex-wrap gap-1" aria-label="Etiquetas">
-            {labels.slice(0, VISIBLE_LABELS).map((label) => (
-              <li
-                key={label}
-                className="max-w-full truncate rounded bg-secondary px-1.5 py-0.5 text-[11px] font-medium text-secondary-foreground"
-              >
-                {label}
-              </li>
-            ))}
-            {labels.length > VISIBLE_LABELS ? (
-              <li
-                title={labels.slice(VISIBLE_LABELS).join(", ")}
-                className="rounded bg-secondary px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground"
-              >
-                +{labels.length - VISIBLE_LABELS}
-              </li>
-            ) : null}
-          </ul>
+        {editable || labels.length ? (
+          <div className="mt-2">
+            <LabelsPicker
+              labels={labels}
+              disabled={!editable}
+              onChange={(next) => save({ labels: next })}
+            />
+          </div>
         ) : null}
         <div className="mt-3 flex items-center justify-between gap-2">
           <span className="flex items-center gap-2">
@@ -400,12 +682,19 @@ export function TaskCard({
                 {attachmentCount}
               </span>
             ) : null}
-            <PriorityIcon priority={priority} />
-            {assigneeName ? (
-              <UserAvatar name={assigneeName} />
-            ) : (
-              <UnassignedAvatar />
-            )}
+            <PriorityPicker
+              priority={priority}
+              disabled={!editable}
+              onPick={(value) => save({ priority: value })}
+            />
+            <AssigneePicker
+              assigneeId={assigneeId}
+              assigneeName={assigneeName}
+              assignees={assignees}
+              teamIds={teamIds}
+              canAssign={canAssign}
+              onPick={(newId) => save({ assigneeId: newId })}
+            />
           </span>
         </div>
       </article>

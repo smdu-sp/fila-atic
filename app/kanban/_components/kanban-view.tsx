@@ -760,8 +760,10 @@ export function KanbanView({
                   column.items.map((item, index) => (
                     <TaskCard
                       key={item.id}
+                      id={item.id}
                       title={item.title}
                       createdAt={item.createdAt}
+                      assigneeId={item.assigneeId}
                       assigneeName={item.assigneeName}
                       priority={item.priority}
                       labels={item.labels}
@@ -785,6 +787,11 @@ export function KanbanView({
                         index,
                       )}
                       onOpen={() => setEditingId(item.id)}
+                      editable={canMoveTask(item)}
+                      canAssign={isManager}
+                      assignees={assignees}
+                      teamIds={teamIdsOf(item.projectId ?? selectedProjectId)}
+                      onChanged={reloadTasks}
                     />
                   ))
                 )}
