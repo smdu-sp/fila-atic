@@ -1,0 +1,63 @@
+name: CI
+
+# Lint, type-check, the automated test suite (against a real, disposable
+# Postgres) and a production build. Runs on every push to main and on every
+# pull request; a red check here is what a deploy workflow should require
+# before it goes anywhere.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: root
+          POSTGRES_PASSWORD: rootpassword
+          POSTGRES_DB: fila_atic_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U root"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # Not real secrets: this database and these values live only for the
+      # duration of the job. Real secrets never go in a workflow file.
+      DATABASE_URL: postgresql://root:rootpassword@localhost:5432/fila_atic_db
+      NEXTAUTH_SECRET: ci-secret
+      NEXTAUTH_URL: http://localhost:3003
+      ENVIRONMENT: local
+      LDAP_URL: ldap://unused:389
+      LDAP_BASE_DN: DC=unused
+      PUBLIC_REQUEST_ALLOWED_DOMAINS: teste.gov.br
+      SMTP_HOST: ""
+      CRON_SECRET: ""
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npx prisma generate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      - name: Tests
+        run: npm test
+
+      - name: Production build
+        run: npm run build
