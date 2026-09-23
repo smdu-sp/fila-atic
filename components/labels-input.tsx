@@ -48,9 +48,9 @@ export function LabelsInput({
           {value.map((label) => (
             <li
               key={label}
-              className="flex items-center gap-1 rounded-full bg-secondary py-0.5 pl-2.5 pr-1 text-xs font-medium text-secondary-foreground"
+              className="flex max-w-full items-center gap-1 rounded-full bg-secondary py-0.5 pl-2.5 pr-1 text-xs font-medium text-secondary-foreground"
             >
-              {label}
+              <span className="min-w-0 truncate">{label}</span>
               {disabled ? null : (
                 <button
                   type="button"

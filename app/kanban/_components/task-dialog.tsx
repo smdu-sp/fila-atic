@@ -64,7 +64,7 @@ export function TaskDialog({
 }: TaskDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="xl">
+      <DialogContent size="2xl">
         {task ? (
           <TaskDialogBody
             key={task.id}
@@ -289,7 +289,7 @@ function TaskDialogBody({
         mainAfter={
           <>
             <section className="grid gap-2" aria-label="Anexos">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <h4 className="text-sm font-medium">
                   Anexos
                   {details?.attachments.length

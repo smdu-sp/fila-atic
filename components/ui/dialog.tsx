@@ -45,6 +45,7 @@ const contentSizes = {
   md: "sm:max-w-lg",
   lg: "sm:max-w-2xl",
   xl: "sm:max-w-4xl",
+  "2xl": "sm:max-w-5xl",
 } as const;
 
 // Children are laid out in a column with a fixed gap, so screens only put
