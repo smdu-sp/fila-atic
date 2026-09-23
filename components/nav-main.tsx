@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import {
+  BarChart3Icon,
   FileTextIcon,
   FolderIcon,
   LayoutIcon,
@@ -39,6 +40,12 @@ const menuGeral = [
     title: "Fila de demandas",
     url: "/fila",
     icon: ListIcon,
+    roles: COORDINATION_ROLES,
+  },
+  {
+    title: "Relatórios",
+    url: "/relatorios",
+    icon: BarChart3Icon,
     roles: COORDINATION_ROLES,
   },
   {

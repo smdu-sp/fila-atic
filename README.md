@@ -97,6 +97,10 @@ Os cartões podem ser arrastados entre colunas e reordenados dentro delas (a pos
 
 A coordenação também classifica cada solicitação em uma categoria (erro/correção, melhoria, sistema novo, suporte/dúvida, outro), filtrável em `/fila` e `/projetos`.
 
+## Relatórios
+
+`/relatorios` (coordenação e Tech Lead) mostra indicadores gerais e desempenho por desenvolvedor, com filtro opcional de período (data de/até). Contagens de solicitações (por status, prioridade e categoria) e o tempo médio por etapa usam a data em que a solicitação, ou a mudança de status, aconteceu dentro do período; tarefas em aberto e atrasadas por desenvolvedor são sempre a situação atual, independente do período escolhido. O tempo por etapa só considera etapas já concluídas (a etapa atual de um projeto em andamento não entra na média) e depende do histórico em `ProjectStatusChange`, existente a partir da migration `20260918180000_project_status_history_and_task_cancel`.
+
 ## Anexos
 
 Os anexos das mensagens e das tarefas ficam em `storage/uploads/` (fora de `public/`, ignorado pelo git) e são servidos por `/uploads/[name]`, que exige sessão e acesso ao chamado; arquivos de tarefa são trabalho interno e nunca são entregues a solicitantes. Limites: 3 arquivos por envio, 10 MB cada, apenas tipos de documento e imagem (ver `lib/uploads.ts`). O limite de corpo da requisição (`next.config.ts`) precisa acompanhar esses números: o proxy do Next corta em 10 MB por padrão. Em produção, faça backup desse diretório junto com o banco.
