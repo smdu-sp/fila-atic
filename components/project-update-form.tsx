@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { useStatusChangeGuard } from "@/components/use-status-change";
 import {
   categoryLabels,
@@ -36,6 +37,8 @@ const schema = z.object({
   priority: z.nativeEnum(ProjectPriority),
   dueDate: z.string().optional(),
   category: z.string().optional(),
+  title: z.string().optional(),
+  description: z.string().optional(),
 });
 
 // Value of the category select that means "no category".
@@ -54,6 +57,10 @@ type ProjectUpdateFormProps = {
   // Same opt-in for the kind of demand (managers only).
   showCategory?: boolean;
   defaultCategory?: ProjectCategory | null;
+  // Same opt-in for title and description (stack layout only).
+  showTitleDescription?: boolean;
+  defaultTitle?: string;
+  defaultDescription?: string;
   compact?: boolean;
   // grid/inline: compact rows inside lists. stack: labelled fields for dialogs.
   layout?: "grid" | "inline" | "stack";
@@ -70,6 +77,9 @@ export function ProjectUpdateForm({
   defaultDueDate = "",
   showCategory = false,
   defaultCategory = null,
+  showTitleDescription = false,
+  defaultTitle = "",
+  defaultDescription = "",
   compact = false,
   layout = "grid",
   formId,
@@ -88,10 +98,17 @@ export function ProjectUpdateForm({
       priority: defaultPriority,
       dueDate: defaultDueDate,
       category: defaultCategory ?? NO_CATEGORY,
+      title: defaultTitle,
+      description: defaultDescription,
     },
   });
 
   const onSubmit = handleSubmit((values) => {
+    if (showTitleDescription && !values.title?.trim()) {
+      toast.error("Informe o título do projeto.");
+      return;
+    }
+
     startTransition(async () => {
       await guard.request(values.status, (options) =>
         updateProject({
@@ -105,6 +122,12 @@ export function ProjectUpdateForm({
                   values.category && values.category !== NO_CATEGORY
                     ? (values.category as ProjectCategory)
                     : null,
+              }
+            : {}),
+          ...(showTitleDescription
+            ? {
+                title: values.title?.trim(),
+                description: values.description?.trim(),
               }
             : {}),
           ...options,
@@ -122,10 +145,10 @@ export function ProjectUpdateForm({
       : showDueDate && showCategory
         ? "grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]"
         : showDueDate
-        ? "grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]"
-        : compact
-          ? "grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
-          : "grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]";
+          ? "grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]"
+          : compact
+            ? "grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+            : "grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]";
   const statusWidthClass = inline ? "w-[140px] shrink-0" : "w-full";
   const priorityWidthClass = inline ? "w-[120px] shrink-0" : "w-full";
 
@@ -218,11 +241,7 @@ export function ProjectUpdateForm({
   ) : null;
 
   const submit = showSubmit ? (
-    <Button
-      size={stack ? "default" : "xs"}
-      type="submit"
-      disabled={isPending}
-    >
+    <Button size={stack ? "default" : "xs"} type="submit" disabled={isPending}>
       {isPending ? "Salvando" : "Salvar"}
     </Button>
   ) : null;
@@ -232,6 +251,22 @@ export function ProjectUpdateForm({
       <Form onSubmit={onSubmit} className={formClassName} id={formId}>
         {stack ? (
           <>
+            {showTitleDescription ? (
+              <>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="project-title">Título</Label>
+                  <Input id="project-title" {...register("title")} />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="project-description">Descrição</Label>
+                  <Textarea
+                    id="project-description"
+                    rows={4}
+                    {...register("description")}
+                  />
+                </div>
+              </>
+            ) : null}
             <div className="grid gap-1.5">
               <Label htmlFor="project-status">Status</Label>
               {statusSelect}
