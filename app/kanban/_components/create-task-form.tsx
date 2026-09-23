@@ -1,20 +1,16 @@
 "use client";
 
-import { useEffect, useTransition } from "react";
-import { useForm, Controller } from "react-hook-form";
-import { z } from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { ProjectPriority, TaskStatus } from "@prisma/client";
 
 import { createTask } from "@/actions/taskActions";
-import { AssigneeItems } from "@/app/kanban/_components/assignee-items";
+import { NO_ASSIGNEE } from "@/app/kanban/_components/assignee-items";
+import { TaskFormFields } from "@/app/kanban/_components/task-fields";
+import { TASK_STATUS_ORDER } from "@/app/kanban/_components/task-types";
 import { Button } from "@/components/ui/button";
-import { LabelsInput } from "@/components/labels-input";
 import { DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Form } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -22,86 +18,95 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { getPriorityLabel } from "@/lib/projectLabels";
 
 type ProjectOption = { id: string; title: string };
-
-const schema = z.object({
-  projectId: z.string().min(1, "Selecione um projeto"),
-  title: z.string().min(3, "Informe o titulo"),
-  description: z.string().optional(),
-  status: z.nativeEnum(TaskStatus).optional(),
-  assigneeId: z.string().optional(),
-  dueDate: z.string().optional(),
-  priority: z.nativeEnum(ProjectPriority),
-  labels: z.array(z.string()),
-});
-
-type FormValues = z.infer<typeof schema>;
+type Assignee = { id: string; name: string };
 
 type CreateTaskFormProps = {
   projects: ProjectOption[];
   initialProjectId?: string;
   initialStatus?: TaskStatus;
   hideProjectSelect?: boolean;
-  // Empty when the current role cannot assign tasks.
-  assignees?: Array<{ id: string; name: string }>;
+  statusLabels: Record<TaskStatus, string>;
+  // Empty (and no picker shown) when the current role cannot assign tasks.
+  isManager?: boolean;
+  assignees?: Assignee[];
   // Members of the project: listed first in the assignee picker.
   teamIds?: string[];
   onCreated?: () => void;
 };
 
+type FormState = {
+  projectId: string;
+  title: string;
+  description: string;
+  status: TaskStatus;
+  priority: ProjectPriority;
+  assignee: string;
+  dueDate: string;
+  labels: string[];
+};
+
+const blank = (projectId: string, status?: TaskStatus): FormState => ({
+  projectId,
+  title: "",
+  description: "",
+  status: status ?? TASK_STATUS_ORDER[0],
+  priority: ProjectPriority.MEDIUM,
+  assignee: NO_ASSIGNEE,
+  dueDate: "",
+  labels: [],
+});
+
+// Same fields, same layout and the same behavior as the dialog opened by
+// clicking an existing task (see TaskDialog): only what does not yet make
+// sense for a task that does not exist (attachments, comments) is left out.
 export function CreateTaskForm({
   projects,
   initialProjectId,
   initialStatus,
   hideProjectSelect = false,
+  statusLabels,
+  isManager = false,
   assignees = [],
   teamIds = [],
   onCreated,
 }: CreateTaskFormProps) {
+  // The dialog that hosts this form unmounts it when closed, so a fresh
+  // mount (not an effect) is what resets the fields for the next project or
+  // column; see TaskDialog's `key={task.id}` for the same pattern.
   const [isPending, startTransition] = useTransition();
-  const { control, register, handleSubmit, reset, formState } =
-    useForm<FormValues>({
-      resolver: zodResolver(schema),
-      defaultValues: {
-        projectId: initialProjectId ?? "",
-        title: "",
-        description: "",
-        status: initialStatus,
-        assigneeId: "",
-        dueDate: "",
-        priority: ProjectPriority.MEDIUM,
-        labels: [],
-      },
-    });
+  const [form, setForm] = useState(() =>
+    blank(initialProjectId ?? "", initialStatus),
+  );
+  const [titleError, setTitleError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (initialProjectId || initialStatus) {
-      reset({
-        projectId: initialProjectId ?? "",
-        title: "",
-        description: "",
-        status: initialStatus,
-        assigneeId: "",
-        dueDate: "",
-        priority: ProjectPriority.MEDIUM,
-        labels: [],
-      });
+  const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
+    setForm((prev) => ({ ...prev, [key]: value }));
+
+  const submit = () => {
+    const title = form.title.trim();
+    if (title.length < 3) {
+      setTitleError("Informe o título (pelo menos 3 caracteres)");
+      return;
     }
-  }, [initialProjectId, initialStatus, reset]);
+    if (!form.projectId) {
+      toast.error("Selecione um projeto.");
+      return;
+    }
+    setTitleError(null);
 
-  const onSubmit = handleSubmit((values) => {
     startTransition(async () => {
       const result = await createTask({
-        projectId: values.projectId,
-        title: values.title,
-        description: values.description,
-        status: values.status,
-        assigneeId: values.assigneeId || null,
-        dueDate: values.dueDate || null,
-        priority: values.priority,
-        labels: values.labels,
+        projectId: form.projectId,
+        title,
+        description: form.description.trim() || undefined,
+        status: form.status,
+        priority: form.priority,
+        assigneeId:
+          isManager && form.assignee !== NO_ASSIGNEE ? form.assignee : null,
+        dueDate: form.dueDate || null,
+        labels: form.labels,
       });
 
       if (!result.success) {
@@ -110,143 +115,68 @@ export function CreateTaskForm({
       }
 
       toast.success("Tarefa criada.");
-      reset({
-        projectId: values.projectId,
-        title: "",
-        description: "",
-        status: values.status,
-        assigneeId: "",
-        dueDate: "",
-        priority: ProjectPriority.MEDIUM,
-        labels: [],
-      });
+      setForm(blank(form.projectId, form.status));
       onCreated?.();
     });
-  });
+  };
 
   return (
-    <Form onSubmit={onSubmit} className="grid gap-4">
+    <div className="grid gap-4">
       {hideProjectSelect ? null : (
         <div className="grid gap-1.5">
-          <Label htmlFor="task-project">Projeto</Label>
-          <Controller
-            control={control}
-            name="projectId"
-            render={({ field }) => (
-              <Select value={field.value} onValueChange={field.onChange}>
-                <SelectTrigger id="task-project" className="w-full">
-                  <SelectValue placeholder="Selecione o projeto" />
-                </SelectTrigger>
-                <SelectContent>
-                  {projects.map((project) => (
-                    <SelectItem key={project.id} value={project.id}>
-                      {project.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          />
-          {formState.errors.projectId ? (
-            <span className="text-xs text-destructive">
-              {formState.errors.projectId.message}
-            </span>
-          ) : null}
+          <Label htmlFor="task-create-project">Projeto</Label>
+          <Select
+            value={form.projectId}
+            onValueChange={(value) => set("projectId", value)}
+          >
+            <SelectTrigger id="task-create-project" className="w-full">
+              <SelectValue placeholder="Selecione o projeto" />
+            </SelectTrigger>
+            <SelectContent>
+              {projects.map((project) => (
+                <SelectItem key={project.id} value={project.id}>
+                  {project.title}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       )}
-      <div className="grid gap-1.5">
-        <Label htmlFor="task-title">Título</Label>
-        <Input
-          id="task-title"
-          placeholder="O que precisa ser feito"
-          {...register("title")}
-        />
-        {formState.errors.title ? (
-          <span className="text-xs text-destructive">
-            {formState.errors.title.message}
-          </span>
-        ) : null}
-      </div>
-      <div className="grid gap-1.5">
-        <Label htmlFor="task-description">Descrição (opcional)</Label>
-        <Input
-          id="task-description"
-          placeholder="Detalhes, links, critérios de aceite"
-          {...register("description")}
-        />
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        {assignees.length ? (
-          <div className="grid gap-1.5">
-            <Label htmlFor="task-assignee">Responsável (opcional)</Label>
-            <Controller
-              control={control}
-              name="assigneeId"
-              render={({ field }) => (
-                <Select
-                  value={field.value || "none"}
-                  onValueChange={(value) =>
-                    field.onChange(value === "none" ? "" : value)
-                  }
-                >
-                  <SelectTrigger id="task-assignee" className="w-full">
-                    <SelectValue placeholder="Sem responsável" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <AssigneeItems assignees={assignees} teamIds={teamIds} />
-                  </SelectContent>
-                </Select>
-              )}
-            />
-          </div>
-        ) : null}
-        <div className="grid gap-1.5">
-          <Label htmlFor="task-due">Prazo (opcional)</Label>
-          <Input id="task-due" type="date" {...register("dueDate")} />
-        </div>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="grid gap-1.5">
-          <Label htmlFor="task-priority">Prioridade</Label>
-          <Controller
-            control={control}
-            name="priority"
-            render={({ field }) => (
-              <Select value={field.value} onValueChange={field.onChange}>
-                <SelectTrigger id="task-priority" className="w-full">
-                  <SelectValue placeholder="Prioridade" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.values(ProjectPriority).map((priority) => (
-                    <SelectItem key={priority} value={priority}>
-                      {getPriorityLabel(priority)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          />
-        </div>
-        <div className="grid gap-1.5">
-          <Label htmlFor="task-labels">Etiquetas (opcional)</Label>
-          <Controller
-            control={control}
-            name="labels"
-            render={({ field }) => (
-              <LabelsInput
-                id="task-labels"
-                value={field.value}
-                onChange={field.onChange}
-              />
-            )}
-          />
-        </div>
-      </div>
+
+      <TaskFormFields
+        idPrefix="task-create"
+        title={form.title}
+        onTitleChange={(value) => {
+          set("title", value);
+          if (titleError) setTitleError(null);
+        }}
+        description={form.description}
+        onDescriptionChange={(value) => set("description", value)}
+        status={form.status}
+        onStatusChange={(value) => set("status", value)}
+        statusOrder={TASK_STATUS_ORDER}
+        statusLabels={statusLabels}
+        priority={form.priority}
+        onPriorityChange={(value) => set("priority", value)}
+        showAssigneeSelect={isManager}
+        assignee={form.assignee}
+        onAssigneeChange={(value) => set("assignee", value)}
+        assigneeOptions={assignees}
+        teamIds={teamIds}
+        dueDate={form.dueDate}
+        onDueDateChange={(value) => set("dueDate", value)}
+        labels={form.labels}
+        onLabelsChange={(value) => set("labels", value)}
+      />
+      {titleError ? (
+        <span className="-mt-2 text-xs text-destructive">{titleError}</span>
+      ) : null}
+
       <DialogFooter>
-        <Button type="submit" disabled={isPending}>
+        <Button onClick={submit} disabled={isPending}>
           {isPending ? "Criando" : "Criar tarefa"}
         </Button>
       </DialogFooter>
-    </Form>
+    </div>
   );
 }

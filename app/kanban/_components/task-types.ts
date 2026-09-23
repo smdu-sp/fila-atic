@@ -1,4 +1,17 @@
-import type { ProjectPriority, TaskStatus } from "@prisma/client";
+import { TaskStatus, type ProjectPriority } from "@prisma/client";
+
+// Canonical column order of the task board, shared by the board itself and
+// by every place that offers a status <Select> (create and edit dialogs).
+export const TASK_STATUS_ORDER: TaskStatus[] = [
+  TaskStatus.TODO,
+  TaskStatus.IN_PROGRESS,
+  TaskStatus.TESTING,
+  TaskStatus.WAITING,
+  TaskStatus.PAUSED,
+  TaskStatus.DONE,
+  TaskStatus.DEPLOYED,
+  TaskStatus.CANCELED,
+];
 
 export type TaskItem = {
   id: string;

@@ -18,6 +18,7 @@ import { PriorityIcon, UserAvatar } from "@/app/kanban/_components/board-ui";
 import { DueBadge } from "@/components/due-badge";
 import { TaskProgress } from "@/components/task-progress";
 import { useStatusChangeGuard } from "@/components/use-status-change";
+import { isManagerRole } from "@/lib/roles";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -200,6 +201,8 @@ export function ProjectTasksPanel({
             projects={[{ id: projectId, title: "" }]}
             initialProjectId={projectId}
             hideProjectSelect
+            statusLabels={taskLabels}
+            isManager={isManagerRole(role)}
             assignees={assignableDevelopers}
             teamIds={team.map((person) => person.id)}
             onCreated={() => {

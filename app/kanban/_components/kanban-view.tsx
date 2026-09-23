@@ -36,6 +36,7 @@ import { CreateTaskForm } from "@/app/kanban/_components/create-task-form";
 import { TaskDialog } from "@/app/kanban/_components/task-dialog";
 import {
   compareTasks,
+  TASK_STATUS_ORDER,
   type TaskItem,
 } from "@/app/kanban/_components/task-types";
 import { TaskProgress } from "@/components/task-progress";
@@ -101,18 +102,22 @@ const projectColumns: { status: ProjectStatus; dot: string }[] = [
   { status: ProjectStatus.FINISHED, dot: "bg-emerald-500" },
 ];
 
-const taskColumns: { status: TaskStatus; dot: string }[] = [
-  { status: TaskStatus.TODO, dot: "bg-slate-400" },
-  { status: TaskStatus.IN_PROGRESS, dot: "bg-sky-500" },
-  { status: TaskStatus.TESTING, dot: "bg-violet-500" },
-  { status: TaskStatus.WAITING, dot: "bg-amber-500" },
-  { status: TaskStatus.PAUSED, dot: "bg-orange-500" },
-  { status: TaskStatus.DONE, dot: "bg-emerald-500" },
-  { status: TaskStatus.DEPLOYED, dot: "bg-teal-500" },
-  { status: TaskStatus.CANCELED, dot: "bg-rose-400" },
-];
+const taskColumnDots: Record<TaskStatus, string> = {
+  TODO: "bg-slate-400",
+  IN_PROGRESS: "bg-sky-500",
+  TESTING: "bg-violet-500",
+  WAITING: "bg-amber-500",
+  PAUSED: "bg-orange-500",
+  DONE: "bg-emerald-500",
+  DEPLOYED: "bg-teal-500",
+  CANCELED: "bg-rose-400",
+};
 
-const taskStatusOrder = taskColumns.map((column) => column.status);
+const taskStatusOrder = TASK_STATUS_ORDER;
+const taskColumns = taskStatusOrder.map((status) => ({
+  status,
+  dot: taskColumnDots[status],
+}));
 
 // Special value of the project picker: my tasks, from every project.
 const MINE = "__mine__";
@@ -812,6 +817,8 @@ export function KanbanView({
             initialProjectId={selectedProjectId}
             initialStatus={createStatus}
             hideProjectSelect={Boolean(selectedProjectId)}
+            statusLabels={statusLabelsState}
+            isManager={isManager}
             assignees={assignees}
             teamIds={teamIdsOf(selectedProjectId)}
             onCreated={handleCreated}
