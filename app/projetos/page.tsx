@@ -26,15 +26,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  SidebarInset,
-  SidebarProvider,
-} from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { CreateProjectForm } from "@/app/projetos/_components/create-project-form";
 import { EditProjectDialog } from "@/app/projetos/_components/edit-project-dialog";
 import { getServerAuthSession, requireRole } from "@/lib/auth";
 import { toDateInput } from "@/lib/dueDate";
 import { firstParam, oneOf, parsePage } from "@/lib/listParams";
+import { formatProjectCode } from "@/lib/projectCode";
 import {
   categoryLabels,
   getCategoryLabel,
@@ -65,7 +63,11 @@ export default async function ProjetosPage({
 }: {
   searchParams: SearchParams;
 }) {
-  await requireRole([...COORDINATION_ROLES, Role.DEV_GLOBAL, Role.DEV_RESTRICTED]);
+  await requireRole([
+    ...COORDINATION_ROLES,
+    Role.DEV_GLOBAL,
+    Role.DEV_RESTRICTED,
+  ]);
 
   const raw = await searchParams;
   const filters = {
@@ -185,8 +187,8 @@ export default async function ProjetosPage({
                   <DialogHeader>
                     <DialogTitle>Nova solicitação</DialogTitle>
                     <DialogDescription>
-                      Descreva o que é necessário. A coordenação faz a triagem
-                      e a prioridade.
+                      Descreva o que é necessário. A coordenação faz a triagem e
+                      a prioridade.
                     </DialogDescription>
                   </DialogHeader>
                   <CreateProjectForm fields={requestFields} />
@@ -221,12 +223,16 @@ export default async function ProjetosPage({
                       <div className="grid gap-1.5">
                         <Link
                           href={`/solicitacoes/${project.id}`}
-                          className="text-sm font-semibold text-foreground hover:underline"
+                          className="flex flex-wrap items-baseline gap-x-2 text-sm font-semibold text-foreground hover:underline"
                         >
+                          <span className="font-mono text-xs font-normal text-muted-foreground">
+                            {formatProjectCode(project.code)}
+                          </span>
                           {project.title}
                         </Link>
                         <p className="text-xs text-muted-foreground">
-                          {project.requesterName} · {project.requesterDepartment}
+                          {project.requesterName} ·{" "}
+                          {project.requesterDepartment}
                         </p>
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                           <TaskProgress
@@ -254,6 +260,7 @@ export default async function ProjetosPage({
                         {canManage ? (
                           <EditProjectDialog
                             projectId={project.id}
+                            code={project.code}
                             title={project.title}
                             status={project.status}
                             priority={project.priority}

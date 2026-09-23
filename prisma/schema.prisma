@@ -81,6 +81,8 @@ model User {
 
 model Project {
   id            String             @id @default(uuid())
+  // Sequential, human-facing identifier ("ATC-0001"); see lib/projectCode.ts.
+  code          Int                @unique @default(autoincrement())
   title         String
   description   String             @db.Text
   justification String             @db.Text

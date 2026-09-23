@@ -38,6 +38,7 @@ type ActionResult<T> =
 
 type ProjectDetails = {
   id: string;
+  code: number;
   title: string;
   description: string;
   justification: string;
@@ -123,13 +124,14 @@ export async function getProjectDetails(
   if (!auth.success) return auth;
 
   if (!projectId) {
-    return { success: false, error: "Chamado invalido" };
+    return { success: false, error: "Projeto invalido" };
   }
 
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     select: {
       id: true,
+      code: true,
       title: true,
       description: true,
       justification: true,
@@ -157,7 +159,7 @@ export async function getProjectDetails(
   });
 
   if (!project) {
-    return { success: false, error: "Chamado nao encontrado" };
+    return { success: false, error: "Projeto nao encontrado" };
   }
 
   const canAccess = await canAccessProject(
@@ -194,6 +196,7 @@ export async function getProjectDetails(
     success: true,
     data: {
       id: project.id,
+      code: project.code,
       title: project.title,
       description: project.description,
       justification: project.justification,
@@ -226,7 +229,7 @@ export async function listProjectMessages(
   if (!auth.success) return auth;
 
   if (!projectId) {
-    return { success: false, error: "Chamado invalido" };
+    return { success: false, error: "Projeto invalido" };
   }
 
   const exists = await prisma.project.findUnique({
@@ -235,7 +238,7 @@ export async function listProjectMessages(
   });
 
   if (!exists) {
-    return { success: false, error: "Chamado nao encontrado" };
+    return { success: false, error: "Projeto nao encontrado" };
   }
 
   const canAccess = await canAccessProject(
@@ -283,7 +286,7 @@ export async function createProjectMessage(
     .filter((file): file is File => file instanceof File && file.size > 0);
 
   if (!projectId) {
-    return { success: false, error: "Chamado invalido" };
+    return { success: false, error: "Projeto invalido" };
   }
 
   const content = message.trim();
@@ -358,7 +361,7 @@ export async function updateProjectStatusRestricted(
   }
 
   if (!projectId || !Object.values(ProjectStatus).includes(status)) {
-    return { success: false, error: "Chamado invalido" };
+    return { success: false, error: "Projeto invalido" };
   }
 
   const canAccess = await canAccessProject(
@@ -376,7 +379,7 @@ export async function updateProjectStatusRestricted(
   });
 
   if (!current) {
-    return { success: false, error: "Chamado nao encontrado" };
+    return { success: false, error: "Projeto nao encontrado" };
   }
 
   const changed = status !== current.status;

@@ -450,6 +450,7 @@ export async function deleteProject(
 
 export type ProjectListItem = {
   id: string;
+  code: number;
   title: string;
   status: ProjectStatus;
   priority: ProjectPriority;
@@ -468,6 +469,7 @@ export type ProjectListItem = {
 
 const projectListSelect = {
   id: true,
+  code: true,
   title: true,
   status: true,
   priority: true,
@@ -515,6 +517,7 @@ async function toListItems(
 
   return rows.map((item) => ({
     id: item.id,
+    code: item.code,
     title: item.title,
     status: item.status,
     priority: item.priority,

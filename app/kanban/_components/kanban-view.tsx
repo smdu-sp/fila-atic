@@ -69,6 +69,7 @@ import { cn } from "@/lib/utils";
 
 type ProjectItem = {
   id: string;
+  code: number;
   title: string;
   status: ProjectStatus;
   priority: ProjectPriority;
@@ -692,6 +693,7 @@ export function KanbanView({
                 <ProjectCard
                   key={item.id}
                   id={item.id}
+                  code={item.code}
                   title={item.title}
                   priority={item.priority}
                   requesterName={item.requesterName}

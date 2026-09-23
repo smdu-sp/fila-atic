@@ -20,13 +20,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  SidebarInset,
-  SidebarProvider,
-} from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { requireRole } from "@/lib/auth";
 import { toDateInput } from "@/lib/dueDate";
 import { firstParam, oneOf, parsePage } from "@/lib/listParams";
+import { formatProjectCode } from "@/lib/projectCode";
 import {
   categoryLabels,
   getCategoryLabel,
@@ -173,8 +171,11 @@ export default async function FilaPage({
                     <div className="grid gap-1.5">
                       <Link
                         href={`/solicitacoes/${item.id}`}
-                        className="text-sm font-semibold text-foreground hover:underline"
+                        className="flex flex-wrap items-baseline gap-x-2 text-sm font-semibold text-foreground hover:underline"
                       >
+                        <span className="font-mono text-xs font-normal text-muted-foreground">
+                          {formatProjectCode(item.code)}
+                        </span>
                         {item.title}
                       </Link>
                       <p className="text-xs text-muted-foreground">

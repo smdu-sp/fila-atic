@@ -41,6 +41,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { formatProjectCode } from "@/lib/projectCode";
 import { getPriorityLabel } from "@/lib/projectLabels";
 import { cn } from "@/lib/utils";
 
@@ -345,6 +346,7 @@ const cardClassName =
 
 export function ProjectCard({
   id,
+  code,
   title,
   priority,
   requesterName,
@@ -359,6 +361,7 @@ export function ProjectCard({
   onDragEnd,
 }: CardDragProps & {
   id: string;
+  code: number;
   title: string;
   priority: ProjectPriority;
   requesterName: string;
@@ -379,6 +382,9 @@ export function ProjectCard({
         dragging && "rotate-1 opacity-40",
       )}
     >
+      <p className="font-mono text-[11px] text-muted-foreground">
+        {formatProjectCode(code)}
+      </p>
       <Link
         href={`/solicitacoes/${id}`}
         draggable={false}

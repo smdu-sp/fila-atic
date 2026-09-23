@@ -20,14 +20,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  SidebarInset,
-  SidebarProvider,
-} from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { listTasksByProject } from "@/actions/taskActions";
 import { listTaskStatusLabels } from "@/actions/taskStatusActions";
 import { getServerAuthSession } from "@/lib/auth";
 import { formatDueDate, toDateInput } from "@/lib/dueDate";
+import { formatProjectCode } from "@/lib/projectCode";
 import { taskStatusLabels as defaultTaskLabels } from "@/lib/projectLabels";
 import {
   getCategoryLabel,
@@ -76,7 +74,9 @@ export default async function SolicitacaoDetalhePage({
     ? [null, null]
     : await Promise.all([listTasksByProject(id), listTaskStatusLabels()]);
   const projectTasks = tasksResult?.success ? tasksResult.data : [];
-  const taskLabels = labelsResult?.success ? labelsResult.data : defaultTaskLabels;
+  const taskLabels = labelsResult?.success
+    ? labelsResult.data
+    : defaultTaskLabels;
   const canRespond =
     isCoordination(session?.user?.role) ||
     session?.user?.role === Role.DEV_GLOBAL;
@@ -99,13 +99,16 @@ export default async function SolicitacaoDetalhePage({
       <SidebarProvider>
         <AppSidebar />
         <SidebarInset className="min-w-0">
-          <PageHeader title="Detalhes" subtitle={details.title} />
+          <PageHeader
+            title="Detalhes"
+            subtitle={`${formatProjectCode(details.code)} · ${details.title}`}
+          />
           <div className="w-full min-w-0 p-4 pt-6 sm:gap-4 sm:p-6 sm:pt-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="space-y-1">
-                <h1 className="text-2xl font-semibold">Detalhes do chamado</h1>
+                <h1 className="text-2xl font-semibold">Detalhes do projeto</h1>
                 <p className="text-sm text-muted-foreground">
-                  Acompanhe as informacoes e mensagens do chamado.
+                  Acompanhe as informacoes e mensagens do projeto.
                 </p>
               </div>
               <Link
@@ -149,6 +152,9 @@ export default async function SolicitacaoDetalhePage({
             <div className="mt-6 grid gap-4 lg:grid-cols-[1.4fr_1fr]">
               <Card>
                 <CardHeader>
+                  <p className="font-mono text-xs text-muted-foreground">
+                    {formatProjectCode(details.code)}
+                  </p>
                   <CardTitle>{details.title}</CardTitle>
                   <CardDescription>
                     Criado em {details.createdAt.toLocaleDateString("pt-BR")}
@@ -163,7 +169,9 @@ export default async function SolicitacaoDetalhePage({
                       <p className="text-xs font-semibold uppercase tracking-wide">
                         Motivo do cancelamento
                       </p>
-                      <p className="mt-1 whitespace-pre-wrap">{details.closeReason}</p>
+                      <p className="mt-1 whitespace-pre-wrap">
+                        {details.closeReason}
+                      </p>
                     </div>
                   ) : null}
                   <div className="flex flex-wrap items-center gap-2">

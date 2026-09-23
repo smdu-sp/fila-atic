@@ -83,6 +83,7 @@ export async function listQueueProjects(): Promise<
 
 export type QueueItem = {
   id: string;
+  code: number;
   title: string;
   priority: ProjectPriority;
   createdAt: Date;
@@ -156,6 +157,7 @@ export async function searchQueue(
     where,
     select: {
       id: true,
+      code: true,
       title: true,
       priority: true,
       createdAt: true,
@@ -174,6 +176,7 @@ export async function searchQueue(
     data: {
       items: rows.map((row) => ({
         id: row.id,
+        code: row.code,
         title: row.title,
         priority: row.priority,
         createdAt: row.createdAt,
