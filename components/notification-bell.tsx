@@ -75,28 +75,17 @@ export function NotificationBell() {
       await load();
     });
 
-  const badge = unread > 99 ? "99+" : String(unread);
-
   return (
     <DropdownMenu open={open} onOpenChange={handleOpenChange}>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
           size="icon-lg"
-          className="relative"
           aria-label={
             unread > 0 ? `Notificações, ${unread} não lidas` : "Notificações"
           }
         >
           <Bell className="size-5" />
-          {unread > 0 ? (
-            <span
-              aria-hidden="true"
-              className="absolute right-0.5 top-0.5 min-w-4 rounded-full bg-red-500 px-1 text-center text-[10px] font-semibold leading-4 text-white tabular-nums ring-2 ring-background"
-            >
-              {badge}
-            </span>
-          ) : null}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
