@@ -133,7 +133,7 @@ export function ProjectControls({
       {!isInline ? (
         <div className="grid gap-1">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">
-            Gestao do chamado
+            Gestao do projeto
           </p>
         </div>
       ) : null}

@@ -213,7 +213,7 @@ export default async function Page() {
                       ))
                     ) : (
                       <p className="text-sm text-muted-foreground">
-                        Nenhum chamado aberto no momento.
+                        Nenhum projeto aberto no momento.
                       </p>
                     )}
                   </CardContent>
@@ -223,7 +223,7 @@ export default async function Page() {
                   <CardHeader>
                     <CardTitle>Atividades recentes</CardTitle>
                     <CardDescription>
-                      Ultimas atualizacoes dos seus chamados.
+                      Ultimas atualizacoes dos seus projetos.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
