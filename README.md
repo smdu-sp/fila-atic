@@ -1,6 +1,8 @@
 # Fila ATIC
 
-Sistema interno de fila de chamados/projetos de TI. Solicitantes abrem pedidos, a coordenação faz a triagem e os desenvolvedores acompanham a execução em um Kanban de tarefas.
+Sistema interno de gerenciamento de projetos de TI. Solicitantes abrem pedidos, a coordenação faz a triagem e os desenvolvedores acompanham a execução em um Kanban de tarefas.
+
+Para o histórico de decisões e entregas, veja [`docs/journal.md`](docs/journal.md).
 
 ## Stack
 
@@ -9,11 +11,15 @@ Sistema interno de fila de chamados/projetos de TI. Solicitantes abrem pedidos, 
 - NextAuth (JWT) com login via LDAP/Active Directory
 - Tailwind CSS 4, shadcn/ui e Base UI
 
+## Código do projeto
+
+Cada projeto tem um código sequencial e permanente (`ATC-0001`, `ATC-0002`, ...), atribuído na criação e nunca reaproveitado mesmo que o projeto seja excluído (coluna `Project.code`, `Int @default(autoincrement())`; formatado por `lib/projectCode.ts`).
+
 ## Perfis
 
 | Perfil | Rótulo | Acesso |
 | --- | --- | --- |
-| `REQUESTER` | Solicitante | Abre chamados e acompanha os próprios |
+| `REQUESTER` | Solicitante | Abre projetos e acompanha os próprios |
 | `COORDINATOR` | Coordenador | Fila de entrada, usuários, formulário de solicitação, todos os projetos |
 | `TECH_LEAD` | Tech Lead | Mesmas permissões do coordenador (todas as verificações passam por `isCoordination` em `lib/roles.ts`) |
 | `DEV_GLOBAL` | DEV II | Todos os projetos, atribuição de desenvolvedores e tarefas |
@@ -103,7 +109,7 @@ A coordenação também classifica cada solicitação em uma categoria (erro/cor
 
 ## Anexos
 
-Os anexos das mensagens e das tarefas ficam em `storage/uploads/` (fora de `public/`, ignorado pelo git) e são servidos por `/uploads/[name]`, que exige sessão e acesso ao chamado; arquivos de tarefa são trabalho interno e nunca são entregues a solicitantes. Limites: 3 arquivos por envio, 10 MB cada, apenas tipos de documento e imagem (ver `lib/uploads.ts`). O limite de corpo da requisição (`next.config.ts`) precisa acompanhar esses números: o proxy do Next corta em 10 MB por padrão. Em produção, faça backup desse diretório junto com o banco.
+Os anexos das mensagens e das tarefas ficam em `storage/uploads/` (fora de `public/`, ignorado pelo git) e são servidos por `/uploads/[name]`, que exige sessão e acesso ao projeto; arquivos de tarefa são trabalho interno e nunca são entregues a solicitantes. Limites: 3 arquivos por envio, 10 MB cada, apenas tipos de documento e imagem (ver `lib/uploads.ts`). O limite de corpo da requisição (`next.config.ts`) precisa acompanhar esses números: o proxy do Next corta em 10 MB por padrão. Em produção, faça backup desse diretório junto com o banco.
 
 ## Scripts
 
@@ -113,3 +119,7 @@ Os anexos das mensagens e das tarefas ficam em `storage/uploads/` (fora de `publ
 - `npm test`: testes automatizados (Vitest). Usam um banco próprio, `<nome>_test` no mesmo servidor, criado e migrado automaticamente. Nunca tocam no banco de desenvolvimento.
 - `npm run cron:deadlines`: dispara os avisos de prazo no servidor em execução (ver Notificações)
 - `npm run db:seed`: cria ou promove o primeiro coordenador (`SEED_COORDINATOR_EMAIL`)
+
+## CI
+
+`.github/workflows/ci.yml` roda em todo push em `main` e em toda pull request: lint, `tsc --noEmit`, a suíte de testes (contra um Postgres descartável, criado pelo próprio workflow) e um build de produção. Ainda não há deploy automático (CD) — fica para quando definirmos onde e como o sistema é hospedado.
