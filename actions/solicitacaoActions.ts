@@ -1,6 +1,6 @@
 "use server";
 
-import { isManagerRole } from "@/lib/roles";
+import { ASSIGNABLE_ROLES, isManagerRole } from "@/lib/roles";
 import {
   ProjectCategory,
   ProjectPriority,
@@ -76,7 +76,7 @@ type ProjectMessage = {
 type AssignableDeveloper = {
   id: string;
   name: string;
-  role: Extract<Role, "DEV_GLOBAL" | "DEV_RESTRICTED">;
+  role: Extract<Role, "DEV_GLOBAL" | "DEV_RESTRICTED" | "TECH_LEAD">;
 };
 
 async function getUserOrError(): Promise<
@@ -108,7 +108,7 @@ export async function listAssignableDevelopers(): Promise<
   const users = await prisma.user.findMany({
     where: {
       isActive: true,
-      role: { in: [Role.DEV_GLOBAL, Role.DEV_RESTRICTED] },
+      role: { in: ASSIGNABLE_ROLES },
     },
     select: { id: true, name: true, role: true },
     orderBy: { name: "asc" },

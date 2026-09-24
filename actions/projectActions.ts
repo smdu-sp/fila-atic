@@ -1,6 +1,6 @@
 "use server";
 
-import { isCoordination, isManagerRole } from "@/lib/roles";
+import { isAssignableRole, isCoordination, isManagerRole } from "@/lib/roles";
 import {
   ProjectCategory,
   ProjectPriority,
@@ -670,12 +670,7 @@ export async function assignDeveloper(
     return { success: false, error: "Projeto nao encontrado" };
   }
 
-  if (
-    !developer ||
-    !developer.isActive ||
-    (developer.role !== Role.DEV_GLOBAL &&
-      developer.role !== Role.DEV_RESTRICTED)
-  ) {
+  if (!developer || !developer.isActive || !isAssignableRole(developer.role)) {
     return { success: false, error: "Desenvolvedor invalido" };
   }
 

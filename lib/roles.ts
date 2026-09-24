@@ -34,3 +34,15 @@ export const STAFF_ROLES: Role[] = [
 
 export const isStaffRole = (role: Role | null | undefined): boolean =>
   role != null && STAFF_ROLES.includes(role);
+
+// Who can be put on a project team and own tasks: the developers and the tech
+// lead, who also writes code. Coordinators manage the work but are not
+// assigned to it, and requesters never are.
+export const ASSIGNABLE_ROLES: Role[] = [
+  Role.DEV_RESTRICTED,
+  Role.DEV_GLOBAL,
+  Role.TECH_LEAD,
+];
+
+export const isAssignableRole = (role: Role | null | undefined): boolean =>
+  role != null && ASSIGNABLE_ROLES.includes(role);

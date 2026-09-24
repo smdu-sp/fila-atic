@@ -1,4 +1,5 @@
-import { Role, type Prisma, type PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
+import { isAssignableRole } from "@/lib/roles";
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
@@ -16,10 +17,7 @@ export async function ensureTeamMember(
     select: { name: true, role: true },
   });
 
-  if (
-    !user ||
-    (user.role !== Role.DEV_GLOBAL && user.role !== Role.DEV_RESTRICTED)
-  ) {
+  if (!user || !isAssignableRole(user.role)) {
     return;
   }
 

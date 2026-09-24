@@ -1,6 +1,6 @@
 "use server";
 
-import { isCoordination, isStaffRole } from "@/lib/roles";
+import { ASSIGNABLE_ROLES, isCoordination, isStaffRole } from "@/lib/roles";
 import { ProjectStatus, Role, TaskStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
@@ -175,7 +175,7 @@ export async function getDashboardMetrics(): Promise<
       prisma.user.findMany({
         where: {
           isActive: true,
-          role: { in: [Role.DEV_GLOBAL, Role.DEV_RESTRICTED] },
+          role: { in: ASSIGNABLE_ROLES },
         },
         select: { id: true, name: true },
         orderBy: { name: "asc" },

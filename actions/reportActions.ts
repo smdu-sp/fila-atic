@@ -4,7 +4,6 @@ import {
   ProjectCategory,
   ProjectPriority,
   ProjectStatus,
-  Role,
   TaskStatus,
 } from "@prisma/client";
 
@@ -13,7 +12,7 @@ import { todayInAppZone } from "@/lib/dueDate";
 import { dayRange } from "@/lib/listParams";
 import { prisma } from "@/lib/prisma";
 import { averageDaysInStatus, buildTimeline, type Timeline } from "@/lib/reports";
-import { isCoordination } from "@/lib/roles";
+import { ASSIGNABLE_ROLES, isCoordination } from "@/lib/roles";
 import { CLOSED_TASK_STATUSES, DONE_TASK_STATUSES } from "@/lib/taskStatus";
 
 // Reports for coordination: how requests and tasks moved in a period. Every
@@ -185,7 +184,7 @@ export async function getGeneralReport(input: {
     prisma.user.findMany({
       where: {
         isActive: true,
-        role: { in: [Role.DEV_GLOBAL, Role.DEV_RESTRICTED] },
+        role: { in: ASSIGNABLE_ROLES },
       },
       select: { id: true, name: true },
       orderBy: { name: "asc" },

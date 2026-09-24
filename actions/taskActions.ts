@@ -1,6 +1,6 @@
 "use server";
 
-import { isManagerRole } from "@/lib/roles";
+import { isAssignableRole, isManagerRole } from "@/lib/roles";
 import { ProjectPriority, Role, TaskStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
@@ -75,7 +75,7 @@ async function findAssignee(assigneeId: string) {
     select: { name: true, role: true, isActive: true },
   });
 
-  return assignee?.isActive && assignee.role !== Role.REQUESTER
+  return assignee?.isActive && isAssignableRole(assignee.role)
     ? assignee
     : null;
 }
