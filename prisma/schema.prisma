@@ -140,7 +140,8 @@ model Task {
   status      TaskStatus @default(TODO)
   dueDate     DateTime?  @db.Date
   priority    ProjectPriority @default(MEDIUM)
-  // Free tags ("api", "banco de dados"), normalized by lib/taskFields.ts.
+  // Names of labels from the managed palette (model Label). Stored by name so
+  // reads stay a single column; renaming or deleting a label rewrites them.
   labels      String[]   @default([])
   // Order inside a Kanban column (ascending). New tasks get -epoch seconds, so
   // they land on top; moving a card sets a value between its new neighbours.
@@ -153,6 +154,17 @@ model Task {
   project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
+}
+
+// Palette of task labels, registered by the coordination. Tasks can only use
+// labels that exist here (compared ignoring case, see lib/labels.ts).
+model Label {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  // "#rrggbb"
+  color     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model TaskComment {

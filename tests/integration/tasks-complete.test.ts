@@ -73,9 +73,13 @@ const order = async (projectId: string, status: TaskStatus) => {
 
 const notificationsOf = (userId: string) => prisma.notification.findMany({ where: { userId } });
 
+const registerLabels = (...names: string[]) =>
+  prisma.label.createMany({ data: names.map((name) => ({ name, color: "#3b82f6" })) });
+
 describe("priority and labels", () => {
   it("default to medium and none, and are set at creation", async () => {
     const { coord, project } = await setup();
+    await registerLabels("api", "banco de dados");
     actAs(coord);
 
     const plain = await createTask({ projectId: project.id, title: "Simples" });
@@ -83,7 +87,7 @@ describe("priority and labels", () => {
     if (!plain.success || !rich.success) throw new Error("create failed");
 
     expect(await prisma.task.findUniqueOrThrow({ where: { id: plain.data } })).toMatchObject({ priority: ProjectPriority.MEDIUM, labels: [] });
-    expect(await prisma.task.findUniqueOrThrow({ where: { id: rich.data } })).toMatchObject({ priority: ProjectPriority.URGENT, labels: ["API", "banco de dados"] });
+    expect(await prisma.task.findUniqueOrThrow({ where: { id: rich.data } })).toMatchObject({ priority: ProjectPriority.URGENT, labels: ["api", "banco de dados"] });
   });
 
   it("are validated", async () => {
@@ -100,6 +104,7 @@ describe("priority and labels", () => {
   it("changes are logged, and an unchanged update logs nothing", async () => {
     const { coord, project } = await setup();
     const task = await makeTask(project.id, { title: "Tarefa" });
+    await registerLabels("api", "urgente");
     actAs(coord);
 
     await updateTask({ id: task.id, priority: ProjectPriority.HIGH, labels: ["api", "urgente"] });

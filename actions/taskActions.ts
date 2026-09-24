@@ -9,6 +9,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { canAccessProject } from "@/lib/projectAccess";
 import { formatDueDate, parseDateInput, toDateInput } from "@/lib/dueDate";
 import { getPriorityLabel, getTaskStatusLabel } from "@/lib/projectLabels";
+import { resolveTaskLabels } from "@/lib/labelPalette";
 import { LABELS_ERROR, normalizeLabels } from "@/lib/taskFields";
 import { deleteUploads } from "@/lib/uploads";
 import { touchProject } from "@/lib/projectStatus";
@@ -143,6 +144,8 @@ export async function createTask(
       ? { ok: true, value: [] }
       : normalizeLabels(input.labels);
   if (!labels.ok) return { success: false, error: LABELS_ERROR };
+  const palette = await resolveTaskLabels(labels.value);
+  if (!palette.ok) return { success: false, error: palette.error };
 
   const assigneeId = input.assigneeId || null;
   if (assigneeId) {
@@ -164,7 +167,7 @@ export async function createTask(
         status: input.status ?? TaskStatus.TODO,
         dueDate: due.value ?? null,
         priority,
-        labels: labels.value,
+        labels: palette.value,
         // minus the time: ascending order puts new tasks on top of the column
         position: -(Date.now() / 1000),
       },
@@ -247,7 +250,12 @@ export async function updateTask(
   const labels =
     input.labels === undefined ? undefined : normalizeLabels(input.labels);
   if (labels && !labels.ok) return { success: false, error: LABELS_ERROR };
-  const nextLabels = labels?.ok ? labels.value : undefined;
+  let nextLabels: string[] | undefined;
+  if (labels?.ok) {
+    const palette = await resolveTaskLabels(labels.value);
+    if (!palette.ok) return { success: false, error: palette.error };
+    nextLabels = palette.value;
+  }
 
   const canAccess = await canAccessProject(
     auth.data.id,
