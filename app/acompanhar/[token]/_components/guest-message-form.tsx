@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { createGuestMessage } from "@/actions/publicRequestActions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { EmojiTextarea } from "@/components/emoji-picker";
 
 const formatFileSize = (size: number) => {
   if (size < 1024) return `${size} B`;
@@ -52,7 +52,7 @@ export function GuestMessageForm({ token }: { token: string }) {
 
   return (
     <div className="grid gap-3">
-      <Textarea
+      <EmojiTextarea
         placeholder="Escreva uma mensagem para a equipe"
         value={message}
         onChange={(event) => setMessage(event.target.value)}

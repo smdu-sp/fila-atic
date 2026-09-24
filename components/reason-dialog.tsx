@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { EmojiTextarea } from "@/components/emoji-picker";
 
 const MIN = 5;
 const MAX = 1000;
@@ -67,7 +67,7 @@ export function ReasonDialog({
         </DialogHeader>
         <div className="grid gap-1.5">
           <Label htmlFor="reason-text">{label}</Label>
-          <Textarea
+          <EmojiTextarea
             id="reason-text"
             value={reason}
             onChange={(event) => setReason(event.target.value)}

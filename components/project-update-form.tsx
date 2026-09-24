@@ -24,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+import { EmojiInput, EmojiTextarea } from "@/components/emoji-picker";
 import { useStatusChangeGuard } from "@/components/use-status-change";
 import {
   categoryLabels,
@@ -255,11 +255,11 @@ export function ProjectUpdateForm({
               <>
                 <div className="grid gap-1.5">
                   <Label htmlFor="project-title">Título</Label>
-                  <Input id="project-title" {...register("title")} />
+                  <EmojiInput id="project-title" {...register("title")} />
                 </div>
                 <div className="grid gap-1.5">
                   <Label htmlFor="project-description">Descrição</Label>
-                  <Textarea
+                  <EmojiTextarea
                     id="project-description"
                     rows={4}
                     {...register("description")}

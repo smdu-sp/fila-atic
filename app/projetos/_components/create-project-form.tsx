@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+import { EmojiTextarea } from "@/components/emoji-picker";
 import {
   PROJECT_REQUEST_FIELDS,
   type ProjectRequestFieldConfig,
@@ -328,7 +328,7 @@ export function CreateProjectForm({
           <div key={field.id} className="grid gap-2">
             <Label htmlFor={fieldId}>{field.label}</Label>
             {field.fieldType === "LONG_TEXT" ? (
-              <Textarea
+              <EmojiTextarea
                 id={fieldId}
                 placeholder={field.placeholder}
                 {...register(registerName)}

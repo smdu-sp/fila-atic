@@ -6,7 +6,7 @@ import { toast } from "sonner";
 
 import { UserAvatar } from "@/app/kanban/_components/board-ui";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { EmojiTextarea } from "@/components/emoji-picker";
 import { MAX_COMMENT_LENGTH } from "@/lib/taskFields";
 import { formatFileSize, validateUploadFiles } from "@/lib/uploadLimits";
 
@@ -208,7 +208,7 @@ export function CommentsSection({
         </p>
       ) : null}
       <div className="grid gap-2">
-        <Textarea
+        <EmojiTextarea
           aria-label="Novo comentário"
           value={draft}
           rows={2}

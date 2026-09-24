@@ -16,7 +16,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { EmojiTextarea } from "@/components/emoji-picker";
 
 type MessageFormProps = {
   projectId: string;
@@ -104,7 +104,7 @@ export function MessageForm({
           <DialogDescription>{dialogDescription}</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4">
-          <Textarea
+          <EmojiTextarea
             placeholder="Digite sua mensagem"
             value={message}
             onChange={(event) => setMessage(event.target.value)}

@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+import { EmojiInput, EmojiTextarea } from "@/components/emoji-picker";
 import { getPriorityLabel } from "@/lib/projectLabels";
 
 type Assignee = { id: string; name: string };
@@ -87,7 +87,7 @@ export function TaskFormFields({
       <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-5">
         <div className="grid grid-cols-[minmax(0,1fr)] gap-1.5">
           <Label htmlFor={id("title")}>Título</Label>
-          <Input
+          <EmojiInput
             id={id("title")}
             value={title}
             disabled={disabled}
@@ -98,7 +98,7 @@ export function TaskFormFields({
 
         <div className="grid grid-cols-[minmax(0,1fr)] gap-1.5">
           <Label htmlFor={id("description")}>Descrição</Label>
-          <Textarea
+          <EmojiTextarea
             id={id("description")}
             value={description}
             disabled={disabled}
