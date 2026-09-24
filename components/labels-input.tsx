@@ -1,17 +1,15 @@
 "use client";
 
-import { useState, type KeyboardEvent } from "react";
-import { X } from "lucide-react";
+import { useState } from "react";
+import Link from "next/link";
+import { CheckIcon, X } from "lucide-react";
 
+import { LabelChip, useLabelCatalog } from "@/components/label-catalog";
 import { Input } from "@/components/ui/input";
-import {
-  MAX_LABEL_LENGTH,
-  MAX_LABELS,
-  normalizeLabels,
-} from "@/lib/taskFields";
+import { MAX_LABELS } from "@/lib/taskFields";
 
-// Labels as removable chips. Enter, comma or leaving the field adds what was
-// typed; Backspace on an empty field removes the last one.
+// Picks task labels from the managed palette: the chosen ones as removable
+// chips and, below, the palette to toggle from (with a filter once it grows).
 export function LabelsInput({
   id,
   value,
@@ -23,46 +21,41 @@ export function LabelsInput({
   onChange: (labels: string[]) => void;
   disabled?: boolean;
 }) {
-  const [draft, setDraft] = useState("");
+  const { labels: palette, canManage } = useLabelCatalog();
+  const [filter, setFilter] = useState("");
   const full = value.length >= MAX_LABELS;
+  const chosen = new Set(value.map((name) => name.toLowerCase()));
 
-  const commit = (text: string) => {
-    const result = normalizeLabels([...value, ...text.split(",")]);
-    setDraft("");
-    if (result.ok) onChange(result.value);
-  };
+  const toggle = (name: string) =>
+    onChange(
+      chosen.has(name.toLowerCase())
+        ? value.filter((item) => item.toLowerCase() !== name.toLowerCase())
+        : [...value, name],
+    );
 
-  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Enter" || event.key === ",") {
-      event.preventDefault();
-      if (draft.trim()) commit(draft);
-    } else if (event.key === "Backspace" && !draft && value.length) {
-      onChange(value.slice(0, -1));
-    }
-  };
+  const query = filter.trim().toLowerCase();
+  const options = query
+    ? palette.filter((label) => label.name.toLowerCase().includes(query))
+    : palette;
 
   return (
-    <div className="grid gap-2">
+    <div className="grid min-w-0 gap-2">
       {value.length ? (
         <ul className="flex flex-wrap gap-1.5">
-          {value.map((label) => (
-            <li
-              key={label}
-              className="flex max-w-full items-center gap-1 rounded-full bg-secondary py-0.5 pl-2.5 pr-1 text-xs font-medium text-secondary-foreground"
-            >
-              <span className="min-w-0 truncate">{label}</span>
-              {disabled ? null : (
-                <button
-                  type="button"
-                  aria-label={`Remover etiqueta ${label}`}
-                  onClick={() =>
-                    onChange(value.filter((item) => item !== label))
-                  }
-                  className="rounded-full p-0.5 text-muted-foreground hover:bg-background hover:text-foreground"
-                >
-                  <X className="size-3" />
-                </button>
-              )}
+          {value.map((name) => (
+            <li key={name} className="flex max-w-full">
+              <LabelChip name={name} className="py-0.5 pl-2.5 pr-1">
+                {disabled ? null : (
+                  <button
+                    type="button"
+                    aria-label={`Remover etiqueta ${name}`}
+                    onClick={() => toggle(name)}
+                    className="rounded-full p-0.5 opacity-70 hover:bg-black/15 hover:opacity-100"
+                  >
+                    <X className="size-3" />
+                  </button>
+                )}
+              </LabelChip>
             </li>
           ))}
         </ul>
@@ -71,19 +64,70 @@ export function LabelsInput({
         value.length ? null : (
           <span className="text-sm text-muted-foreground">Sem etiquetas</span>
         )
+      ) : palette.length ? (
+        <div className="grid min-w-0 gap-1.5">
+          {palette.length > 6 ? (
+            <Input
+              id={id}
+              value={filter}
+              placeholder="Filtrar etiquetas"
+              aria-label="Filtrar etiquetas"
+              onChange={(event) => setFilter(event.target.value)}
+            />
+          ) : null}
+          <ul
+            id={palette.length > 6 ? undefined : id}
+            className="grid max-h-44 min-w-0 gap-0.5 overflow-y-auto rounded-md border p-1"
+          >
+            {options.length ? (
+              options.map((label) => {
+                const selected = chosen.has(label.name.toLowerCase());
+                return (
+                  <li key={label.name} className="min-w-0">
+                    <button
+                      type="button"
+                      aria-pressed={selected}
+                      disabled={!selected && full}
+                      onClick={() => toggle(label.name)}
+                      className="flex w-full min-w-0 items-center gap-2 rounded px-1.5 py-1 text-start text-sm hover:bg-accent disabled:opacity-50"
+                    >
+                      <span
+                        aria-hidden
+                        className="size-3 shrink-0 rounded-full"
+                        style={{ backgroundColor: label.color }}
+                      />
+                      <span className="min-w-0 flex-1 truncate">{label.name}</span>
+                      {selected ? <CheckIcon className="size-4 shrink-0" /> : null}
+                    </button>
+                  </li>
+                );
+              })
+            ) : (
+              <li className="px-1.5 py-1 text-sm text-muted-foreground">
+                Nenhuma etiqueta encontrada
+              </li>
+            )}
+          </ul>
+          {full ? (
+            <span className="text-xs text-muted-foreground">
+              Máximo de {MAX_LABELS} etiquetas por tarefa.
+            </span>
+          ) : null}
+        </div>
       ) : (
-        <Input
-          id={id}
-          value={draft}
-          maxLength={MAX_LABEL_LENGTH}
-          disabled={full}
-          placeholder={
-            full ? `Máximo de ${MAX_LABELS} etiquetas` : "Digite e tecle Enter"
-          }
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={handleKeyDown}
-          onBlur={() => draft.trim() && commit(draft)}
-        />
+        <p id={id} className="text-sm text-muted-foreground">
+          Nenhuma etiqueta cadastrada.{" "}
+          {canManage ? (
+            <Link
+              href="/administracao/etiquetas"
+              className="underline underline-offset-2"
+            >
+              Cadastrar etiquetas
+            </Link>
+          ) : (
+            "A coordenação cadastra as etiquetas em Administração."
+          )}
+        </p>
       )}
     </div>
   );

@@ -33,6 +33,7 @@ import {
 } from "@/app/kanban/_components/assignee-items";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DueBadge } from "@/components/due-badge";
+import { LabelChip } from "@/components/label-catalog";
 import { LabelsInput } from "@/components/labels-input";
 import { TaskProgress } from "@/components/task-progress";
 import { Button } from "@/components/ui/button";
@@ -435,11 +436,8 @@ function LabelsPicker({
   const chips = labels.length ? (
     <ul className="flex flex-wrap gap-1" aria-label="Etiquetas">
       {labels.slice(0, VISIBLE_LABELS).map((label) => (
-        <li
-          key={label}
-          className="max-w-full truncate rounded bg-secondary px-1.5 py-0.5 text-[11px] font-medium text-secondary-foreground"
-        >
-          {label}
+        <li key={label} className="flex max-w-full">
+          <LabelChip name={label} size="sm" />
         </li>
       ))}
       {labels.length > VISIBLE_LABELS ? (

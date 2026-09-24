@@ -97,11 +97,15 @@ Rodar mais de uma vez no dia é seguro: cada aviso é entregue uma única vez. A
 
 ## Tarefas e Kanban
 
-Clicar em uma tarefa abre o diálogo completo: título, descrição, status, prioridade, responsável, prazo, etiquetas (até 8), anexos e comentários. Só o responsável e a coordenação/DEV II alteram os dados; qualquer pessoa da equipe com acesso ao projeto comenta e anexa. Solicitantes nunca veem tarefas, comentários ou anexos de tarefa.
+Clicar em uma tarefa abre o diálogo completo: título, descrição, status, prioridade, responsável, prazo, etiquetas coloridas (até 8, da paleta cadastrada pela coordenação), anexos e comentários. Só o responsável e a coordenação/DEV II alteram os dados; qualquer pessoa da equipe com acesso ao projeto comenta e anexa. Solicitantes nunca veem tarefas, comentários ou anexos de tarefa.
 
 Os cartões podem ser arrastados entre colunas e reordenados dentro delas (a posição é gravada; tarefas novas entram no topo). Na visão "Minhas tarefas" só a troca de coluna é possível. O quadro filtra por texto, responsável, prioridade e etiqueta.
 
 A coordenação também classifica cada solicitação em uma categoria (erro/correção, melhoria, sistema novo, suporte/dúvida, outro), filtrável em `/fila` e `/projetos`.
+
+### Etiquetas
+
+As etiquetas de tarefa vêm de uma **paleta gerenciada**: a coordenação (coordenador e tech lead) cadastra nome e cor em **Administração → Etiquetas** e todo o resto da equipe só escolhe da lista — sem variações como "urgente/Urgente/URGENTE!!". A cor é qualquer `#rrggbb` (há 12 sugestões e um seletor livre); o texto do chip escolhe sozinho preto ou branco conforme o contraste. Renomear uma etiqueta atualiza todas as tarefas que a usam; recolorir vale na hora em todo o sistema; excluir remove a etiqueta das tarefas. Comparação de nomes ignora maiúsculas/minúsculas, e o servidor recusa etiqueta que não esteja na paleta. O filtro do Kanban lista a paleta inteira.
 
 ## Relatórios
 

@@ -16,6 +16,11 @@ import { updateProjectStatusRestricted } from "@/actions/solicitacaoActions";
 import { CreateTaskForm } from "@/app/kanban/_components/create-task-form";
 import { PriorityIcon, UserAvatar } from "@/app/kanban/_components/board-ui";
 import { DueBadge } from "@/components/due-badge";
+import {
+  LabelCatalogProvider,
+  LabelChip,
+  type CatalogLabel,
+} from "@/components/label-catalog";
 import { TaskProgress } from "@/components/task-progress";
 import { useStatusChangeGuard } from "@/components/use-status-change";
 import { isManagerRole } from "@/lib/roles";
@@ -64,6 +69,18 @@ const CLOSED_PROJECT: ProjectStatus[] = [
 ];
 
 export function ProjectTasksPanel({
+  labelPalette,
+  canManageLabels,
+  ...props
+}: PanelProps & { labelPalette: CatalogLabel[]; canManageLabels: boolean }) {
+  return (
+    <LabelCatalogProvider labels={labelPalette} canManage={canManageLabels}>
+      <TasksPanel {...props} />
+    </LabelCatalogProvider>
+  );
+}
+
+function TasksPanel({
   projectId,
   projectStatus,
   role,
@@ -160,13 +177,11 @@ export function ProjectTasksPanel({
                     {task.title}
                   </span>
                   {task.labels.map((label) => (
-                    <Badge
+                    <LabelChip
                       key={label}
-                      variant="secondary"
+                      name={label}
                       className="hidden shrink-0 sm:inline-flex"
-                    >
-                      {label}
-                    </Badge>
+                    />
                   ))}
                 </span>
                 <span className="flex shrink-0 items-center gap-2">

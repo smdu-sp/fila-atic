@@ -61,6 +61,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  LabelCatalogProvider,
+  useLabelCatalog,
+  type CatalogLabel,
+} from "@/components/label-catalog";
+import {
   getPriorityLabel,
   getStatusLabel,
   getTaskStatusLabel,
@@ -125,7 +130,24 @@ const MINE = "__mine__";
 // Special value of the priority and label filters: no filter.
 const ALL = "__all__";
 
+type LabelPaletteProps = {
+  labelPalette: CatalogLabel[];
+  canManageLabels: boolean;
+};
+
 export function KanbanView({
+  labelPalette,
+  canManageLabels,
+  ...props
+}: KanbanViewProps & LabelPaletteProps) {
+  return (
+    <LabelCatalogProvider labels={labelPalette} canManage={canManageLabels}>
+      <KanbanBoard {...props} />
+    </LabelCatalogProvider>
+  );
+}
+
+function KanbanBoard({
   projects,
   taskStatusLabels,
   canEditStatusLabels,
@@ -258,13 +280,8 @@ export function KanbanView({
     );
   }, [tasks]);
 
-  const taskLabelOptions = useMemo(
-    () =>
-      Array.from(new Set(tasks.flatMap((task) => task.labels))).sort((a, b) =>
-        a.localeCompare(b),
-      ),
-    [tasks],
-  );
+  // the filter offers the whole palette, in the palette order
+  const { labels: labelPalette } = useLabelCatalog();
 
   const editingTask = tasks.find((task) => task.id === editingId) ?? null;
 
@@ -614,7 +631,7 @@ export function KanbanView({
                 ))}
               </SelectContent>
             </Select>
-            {taskLabelOptions.length ? (
+            {labelPalette.length ? (
               <Select value={labelFilter} onValueChange={setLabelFilter}>
                 <SelectTrigger
                   className="w-40 bg-background"
@@ -624,9 +641,16 @@ export function KanbanView({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={ALL}>Todas as etiquetas</SelectItem>
-                  {taskLabelOptions.map((label) => (
-                    <SelectItem key={label} value={label}>
-                      {label}
+                  {labelPalette.map((label) => (
+                    <SelectItem key={label.name} value={label.name}>
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span
+                          aria-hidden
+                          className="size-2.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: label.color }}
+                        />
+                        {label.name}
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>

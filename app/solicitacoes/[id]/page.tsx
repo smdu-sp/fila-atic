@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { listLabels } from "@/actions/labelActions";
 import { PageHeader } from "@/components/page-header";
 import { isCoordination } from "@/lib/roles";
 import { Role } from "@prisma/client";
@@ -76,9 +77,13 @@ export default async function SolicitacaoDetalhePage({
   const isClosed =
     details.status === "FINISHED" || details.status === "CANCELED";
   // Tasks are internal work: requesters only see the project status.
-  const [tasksResult, labelsResult] = isRequester
-    ? [null, null]
-    : await Promise.all([listTasksByProject(id), listTaskStatusLabels()]);
+  const [tasksResult, labelsResult, paletteResult] = isRequester
+    ? [null, null, null]
+    : await Promise.all([
+        listTasksByProject(id),
+        listTaskStatusLabels(),
+        listLabels(),
+      ]);
   const projectTasks = tasksResult?.success ? tasksResult.data : [];
   const taskLabels = labelsResult?.success
     ? labelsResult.data
@@ -211,6 +216,8 @@ export default async function SolicitacaoDetalhePage({
                     role={session?.user?.role ?? Role.REQUESTER}
                     tasks={projectTasks}
                     taskLabels={taskLabels}
+                    labelPalette={paletteResult?.success ? paletteResult.data : []}
+                    canManageLabels={isCoordination(session?.user?.role)}
                     team={details.developers.map((dev) => ({
                       id: dev.id,
                       name: dev.name,

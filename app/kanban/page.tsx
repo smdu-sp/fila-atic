@@ -2,6 +2,7 @@ import { Role } from "@prisma/client";
 
 import { PageHeader } from "@/components/page-header";
 import { COORDINATION_ROLES, isCoordination } from "@/lib/roles";
+import { listLabels } from "@/actions/labelActions";
 import { listProjects } from "@/actions/projectActions";
 import { listAssignableDevelopers } from "@/actions/solicitacaoActions";
 import { listTaskStatusLabels } from "@/actions/taskStatusActions";
@@ -23,11 +24,12 @@ export default async function KanbanPage({
   // /kanban?projeto=<id> opens the task board of that project
   const { projeto } = await searchParams;
 
-  const [projectsResult, labelsResult, developersResult, session] =
+  const [projectsResult, labelsResult, developersResult, paletteResult, session] =
     await Promise.all([
       listProjects(),
       listTaskStatusLabels(),
       listAssignableDevelopers(),
+      listLabels(),
       getServerAuthSession(),
     ]);
   const projects = projectsResult.success ? projectsResult.data : [];
@@ -59,6 +61,8 @@ export default async function KanbanPage({
             <KanbanView
               projects={projects}
               taskStatusLabels={labels}
+              labelPalette={paletteResult.success ? paletteResult.data : []}
+              canManageLabels={canEditStatusLabels}
               canEditStatusLabels={canEditStatusLabels}
               role={session?.user?.role ?? Role.REQUESTER}
               currentUserId={session?.user?.id ?? ""}

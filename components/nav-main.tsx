@@ -12,6 +12,7 @@ import {
   LayoutIcon,
   ListIcon,
   SettingsIcon,
+  TagsIcon,
   UserIcon,
 } from "lucide-react";
 import { Role } from "@prisma/client";
@@ -80,6 +81,12 @@ const menuAdmin = [
     title: "Configurar formulário",
     url: "/administracao/solicitacao",
     icon: SettingsIcon,
+    roles: COORDINATION_ROLES,
+  },
+  {
+    title: "Etiquetas",
+    url: "/administracao/etiquetas",
+    icon: TagsIcon,
     roles: COORDINATION_ROLES,
   },
   {

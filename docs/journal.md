@@ -2,6 +2,18 @@
 
 Registro de decisões e entregas do projeto: o que foi pedido, o que foi feito e por quê. Não substitui o `git log` (que tem o detalhe técnico de cada commit) nem o `README.md` (que descreve o sistema como ele é hoje); serve para explicar o raciocínio por trás das mudanças, na ordem em que aconteceram. Entradas mais novas no topo.
 
+## 2026-09-25 — Fase 10: etiquetas com cor (paleta gerenciada)
+
+Pedido original: "adicionar etiquetas personalizadas com cores personalizadas". Decisão tomada com o usuário na fase de planejamento: **paleta gerenciada** (estilo Jira/Linear) em vez de etiqueta livre — a coordenação cadastra nome + cor e os demais só escolhem. O motivo é o de sempre em texto livre: em pouco tempo aparecem "urgente", "Urgente", "URGENTE!!" e o filtro deixa de servir.
+
+Como ficou:
+
+- **Modelo**: nova tabela `Label` (nome único, cor `#rrggbb`). Decisão de projeto: `Task.labels` continua sendo `String[]` com o *nome* da etiqueta, em vez de virar tabela de junção. Assim as ~20 leituras existentes (Kanban, painel do projeto, listas, filtros, relatórios) não mudam; o custo é que renomear/excluir precisa reescrever os arrays — feito com `array_replace`/`array_remove` na mesma transação da alteração da paleta. Como o nome é único ignorando caixa, a grafia guardada nas tarefas é sempre a da paleta.
+- **Migração com backfill**: as etiquetas livres que já existiam viram linhas da paleta (grafias que só diferem em maiúsculas/minúsculas são unificadas; cores rotacionam por 8 tons) e as tarefas passam a guardar a grafia da paleta, na mesma ordem. Testei o SQL com dados legados misturados (`urgente`/`Urgente`/`API`/`api`) dentro de uma transação que desfiz no final.
+- **Regras no servidor** (`lib/labelPalette.ts`): `createTask`/`updateTask` recusam etiqueta fora da paleta, com a mensagem apontando quais; o que vale é a grafia da paleta ("URGENTE" vira "Urgente"). Limites de 8 por tarefa e 30 caracteres continuam. Só coordenação/tech lead cria, altera e exclui etiquetas; qualquer perfil da equipe lê a paleta; solicitantes não.
+- **Interface**: página **Administração → Etiquetas** (criar com prévia, trocar nome/cor, excluir com aviso de quantas tarefas perdem a etiqueta e contagem de uso). `LabelsInput` deixou de ser campo de texto e virou seletor da paleta (lista com filtro quando passa de 6 etiquetas), usado no diálogo da tarefa, no formulário de criar e no popover do cartão. Chips coloridos em todo lugar via `LabelChip`; a paleta chega aos componentes por um contexto (`LabelCatalogProvider`) em vez de prop em cada nível. O filtro de etiqueta do Kanban lista a paleta inteira, com a cor.
+- **Testes**: 19 novos (unitários de cor/nome/casamento com a paleta; integração de permissões, duplicidade ignorando caixa, renomear carregando as tarefas, excluir limpando as tarefas, tarefa recusando etiqueta inventada). Os testes antigos que usavam etiqueta livre agora cadastram a paleta antes.
+
 ## 2026-09-25 (continuação) — Barra lateral do detalhe: causa real achada com um navegador de verdade
 
 O usuário pediu para eu abrir o navegador e verificar. Não há ferramenta de navegador integrada aqui, mas o Edge está instalado: usei `puppeteer-core` (só o cliente, instalado fora do projeto) para renderizar a página, tirar print e medir cada elemento que passava da borda do pai. Isso resolveu em minutos o que três rodadas de suposições não resolveram.
