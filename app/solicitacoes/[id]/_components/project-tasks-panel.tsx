@@ -205,7 +205,7 @@ function TasksPanel({
       {guard.dialog}
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent>
+        <DialogContent size="2xl">
           <DialogHeader>
             <DialogTitle>Nova tarefa</DialogTitle>
             <DialogDescription>

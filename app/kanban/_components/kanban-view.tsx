@@ -835,7 +835,7 @@ function KanbanBoard({
       {statusGuard.dialog}
 
       <Dialog open={taskDialogOpen} onOpenChange={setTaskDialogOpen}>
-        <DialogContent>
+        <DialogContent size="2xl">
           <DialogHeader>
             <DialogTitle>Nova tarefa</DialogTitle>
             <DialogDescription>

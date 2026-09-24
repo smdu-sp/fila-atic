@@ -82,8 +82,10 @@ export function TaskFormFields({
 
   return (
     <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_15rem]">
-      <div className="grid min-w-0 content-start gap-5">
-        <div className="grid gap-1.5">
+      {/* grid-cols-[minmax(0,1fr)]: a plain grid has an implicit "auto" column that
+          refuses to shrink below its widest child and pushes the side column out */}
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-5">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-1.5">
           <Label htmlFor={id("title")}>Título</Label>
           <Input
             id={id("title")}
@@ -94,7 +96,7 @@ export function TaskFormFields({
           />
         </div>
 
-        <div className="grid gap-1.5">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-1.5">
           <Label htmlFor={id("description")}>Descrição</Label>
           <Textarea
             id={id("description")}
@@ -110,10 +112,10 @@ export function TaskFormFields({
       </div>
 
       <aside
-        className="grid min-w-0 content-start gap-4"
+        className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4"
         aria-label="Dados da tarefa"
       >
-        <div className="grid gap-1.5">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-1.5">
           <Label htmlFor={id("status")}>Status</Label>
           <Select
             value={status}
@@ -132,7 +134,7 @@ export function TaskFormFields({
             </SelectContent>
           </Select>
         </div>
-        <div className="grid gap-1.5">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-1.5">
           <Label htmlFor={id("priority")}>Prioridade</Label>
           <Select
             value={priority}
@@ -154,7 +156,7 @@ export function TaskFormFields({
           </Select>
         </div>
         {showAssigneeSelect ? (
-          <div className="grid gap-1.5">
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-1.5">
             <Label htmlFor={id("assignee")}>Responsável</Label>
             <Select
               value={assignee}
@@ -170,12 +172,12 @@ export function TaskFormFields({
             </Select>
           </div>
         ) : assigneeName ? (
-          <div className="grid gap-1.5">
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-1.5">
             <Label>Responsável</Label>
             <span className="text-sm">{assigneeName}</span>
           </div>
         ) : null}
-        <div className="grid gap-1.5">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-1.5">
           <Label htmlFor={id("due")}>Prazo</Label>
           <Input
             id={id("due")}
@@ -185,7 +187,7 @@ export function TaskFormFields({
             onChange={(event) => onDueDateChange(event.target.value)}
           />
         </div>
-        <div className="grid gap-1.5">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-1.5">
           <Label htmlFor={id("labels")}>Etiquetas</Label>
           <LabelsInput
             id={id("labels")}

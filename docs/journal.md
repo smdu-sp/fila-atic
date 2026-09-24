@@ -2,6 +2,17 @@
 
 Registro de decisões e entregas do projeto: o que foi pedido, o que foi feito e por quê. Não substitui o `git log` (que tem o detalhe técnico de cada commit) nem o `README.md` (que descreve o sistema como ele é hoje); serve para explicar o raciocínio por trás das mudanças, na ordem em que aconteceram. Entradas mais novas no topo.
 
+## 2026-09-25 (continuação) — Diálogos de tarefa: de novo diferentes e cortados
+
+O usuário reportou que o diálogo "Nova tarefa" voltou a ser diferente do de edição e que o de edição estava com o conteúdo cortado na horizontal. Medi no Edge antes de mexer (a lição do bug da barra lateral), e eram dois problemas separados:
+
+- **Tamanhos diferentes**: só o diálogo de edição usava `size="2xl"`; os de criação (Kanban e painel de tarefas do projeto) ficaram no tamanho padrão de 512px desde que unifiquei os campos em `TaskFormFields` — unifiquei o conteúdo, mas não a moldura. Agora os três usam `2xl`.
+- **Conteúdo 97px mais largo que o diálogo**: mesma causa raiz da barra lateral do detalhe. Cada campo da coluna lateral era um `<div className="grid gap-1.5">`; um grid sem `grid-template-columns` tem coluna implícita `auto`, que não encolhe abaixo do conteúdo em uma linha, e o botão do "Responsável" (`whitespace-nowrap`, com o nome completo do desenvolvedor) impunha os ~361px. `minmax(0,1fr)` nos wrappers e nas duas colunas do `TaskFormFields`. O `SelectTrigger` também passou a deixar o valor encolher (`min-w-0`, `overflow-hidden`, `truncate`), para nomes longos não empurrarem nenhum select do sistema.
+
+Medido depois em 1024, 1280 e 1656px: zero elementos fora dos diálogos, e criação/edição com a mesma largura. Por que só apareceu agora: o problema dependia do nome do responsável já selecionado — no diálogo de criação ("Sem responsável") não havia texto longo para estourar.
+
+Regra para não repetir: todo `grid` que contém campos de formulário (selects, botões com texto variável) precisa de `grid-cols-[minmax(0,1fr)]`.
+
 ## 2026-09-25 — Fase 10: etiquetas com cor (paleta gerenciada)
 
 Pedido original: "adicionar etiquetas personalizadas com cores personalizadas". Decisão tomada com o usuário na fase de planejamento: **paleta gerenciada** (estilo Jira/Linear) em vez de etiqueta livre — a coordenação cadastra nome + cor e os demais só escolhem. O motivo é o de sempre em texto livre: em pouco tempo aparecem "urgente", "Urgente", "URGENTE!!" e o filtro deixa de servir.
