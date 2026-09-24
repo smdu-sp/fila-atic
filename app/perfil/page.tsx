@@ -49,7 +49,7 @@ export default async function PerfilPage() {
         <AppSidebar />
         <SidebarInset className="min-w-0">
           <PageHeader title="Perfil" />
-          <div className="w-full min-w-0 bg-muted/50 p-4 pt-6 sm:gap-4 sm:p-6 sm:pt-4">
+          <div className="w-full min-w-0 p-4 pt-6 sm:gap-4 sm:p-6 sm:pt-4">
             <div className="flex flex-col gap-1">
               <h1 className="text-2xl font-semibold">Perfil do usuario</h1>
               <p className="text-sm text-muted-foreground">

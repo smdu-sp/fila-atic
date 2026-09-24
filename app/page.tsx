@@ -147,7 +147,7 @@ export default async function Page() {
     <div className="relative w-full overflow-x-hidden">
       <SidebarProvider>
         <AppSidebar />
-        <SidebarInset className="min-w-0 min-h-svh bg-muted/50">
+        <SidebarInset className="min-w-0 min-h-svh">
           <PageHeader title="Dashboard" />
           <div className="w-full min-w-0 p-4 pt-6 sm:gap-4 sm:p-6 sm:pt-4">
             <div className="flex flex-wrap items-center justify-between gap-3">

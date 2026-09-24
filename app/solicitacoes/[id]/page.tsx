@@ -114,7 +114,7 @@ export default async function SolicitacaoDetalhePage({
             title="Detalhes"
             subtitle={`${formatProjectCode(details.code)} · ${details.title}`}
           />
-          <div className="grid w-full min-w-0 gap-4 bg-muted/50 p-4 pt-6 sm:p-6 sm:pt-4">
+          <div className="grid w-full min-w-0 gap-4 p-4 pt-6 sm:p-6 sm:pt-4">
             <Link
               href="/"
               className="justify-self-end text-sm text-primary underline-offset-4 hover:underline"

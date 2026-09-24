@@ -50,7 +50,7 @@ export default async function NotificacoesPage({
         <AppSidebar />
         <SidebarInset className="min-w-0">
           <PageHeader title="Notificações" />
-          <div className="grid w-full min-w-0 gap-6 bg-muted/50 p-4 pt-6 sm:p-6 sm:pt-4">
+          <div className="grid w-full min-w-0 gap-6 p-4 pt-6 sm:p-6 sm:pt-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="flex flex-col gap-1">
                 <h1 className="text-2xl font-semibold">Notificações</h1>

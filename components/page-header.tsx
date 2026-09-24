@@ -12,7 +12,7 @@ export function PageHeader({
   subtitle?: string;
 }) {
   return (
-    <header className="flex h-14 shrink-0 items-center gap-2 bg-muted/50 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 sm:h-16">
+    <header className="flex h-14 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 sm:h-16">
       <div className="flex min-w-0 flex-1 items-center gap-2 px-3 sm:px-4">
         <SidebarTrigger className="-ml-1 md:hidden" />
         <Separator orientation="vertical" className="mr-2 h-4 md:hidden" />
