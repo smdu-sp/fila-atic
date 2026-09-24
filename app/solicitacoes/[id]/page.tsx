@@ -364,13 +364,12 @@ export default async function SolicitacaoDetalhePage({
               {/* Right sidebar: status/priority controls, team, reporter, dates. */}
               <aside className="grid min-w-0 content-start gap-4 xl:sticky xl:top-4">
                 {!isRequester ? (
-                  // overflow-x-auto here is a backstop: if this narrow column
-                  // ever gets something wider than it (a form field, a long
-                  // name) despite min-w-0, it scrolls inside this box instead
-                  // of breaking the rest of the page. Check this is still
-                  // present before assuming a future overflow report is
-                  // something new.
-                  <div className="min-w-0 overflow-x-auto rounded-xl bg-sky-50 p-4 ring-1 ring-sky-200/70 dark:bg-sky-950/20 dark:ring-sky-900/40">
+                  // Everything inside must use grid columns of
+                  // minmax(0,1fr): a plain `grid` has an `auto` column that
+                  // will not shrink below its content in one line (a full
+                  // name, a nowrap select), pushing the whole box wider than
+                  // this 18rem column.
+                  <div className="min-w-0 rounded-xl bg-sky-50 p-4 ring-1 ring-sky-200/70 dark:bg-sky-950/20 dark:ring-sky-900/40">
                     <ProjectControls
                       projectId={details.id}
                       role={session?.user?.role ?? Role.REQUESTER}

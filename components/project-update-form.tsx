@@ -139,7 +139,7 @@ export function ProjectUpdateForm({
   const stack = layout === "stack";
   const inline = layout === "inline";
   const formClassName = stack
-    ? "grid gap-4"
+    ? "grid grid-cols-[minmax(0,1fr)] gap-4"
     : inline
       ? "flex-row items-center gap-2 shrink-0 whitespace-nowrap"
       : showDueDate && showCategory

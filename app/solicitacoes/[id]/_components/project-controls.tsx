@@ -133,7 +133,7 @@ export function ProjectControls({
   if (variant === "sidebar") {
     return (
       <>
-        <div className="grid gap-4">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
           {role === Role.DEV_RESTRICTED ? (
             <div className="grid gap-1.5">
               <Label htmlFor="project-status-sidebar">Status</Label>
@@ -181,10 +181,10 @@ export function ProjectControls({
           )}
 
           {canManageAll ? (
-            <div className="grid gap-1.5 border-t border-border/60 pt-4">
+            <div className="grid grid-cols-[minmax(0,1fr)] gap-1.5 border-t border-border/60 pt-4">
               <Label>Equipe</Label>
               {assignedDevelopers.length ? (
-                <ul className="grid gap-1.5">
+                <ul className="grid grid-cols-[minmax(0,1fr)] gap-1.5">
                   {assignedDevelopers.map((dev) => (
                     <li
                       key={dev.id}
@@ -212,7 +212,7 @@ export function ProjectControls({
               )}
               <div className="flex items-center gap-2">
                 <Select value={selectedDev} onValueChange={setSelectedDev}>
-                  <SelectTrigger className="w-full" size="sm">
+                  <SelectTrigger className="min-w-0 flex-1 shrink" size="sm">
                     <SelectValue placeholder="Atribuir desenvolvedor" />
                   </SelectTrigger>
                   <SelectContent>
@@ -233,9 +233,9 @@ export function ProjectControls({
               </div>
             </div>
           ) : assignedDevelopers.length ? (
-            <div className="grid gap-1.5 border-t border-border/60 pt-4">
+            <div className="grid grid-cols-[minmax(0,1fr)] gap-1.5 border-t border-border/60 pt-4">
               <Label>Equipe</Label>
-              <ul className="grid gap-1.5">
+              <ul className="grid grid-cols-[minmax(0,1fr)] gap-1.5">
                 {assignedDevelopers.map((dev) => (
                   <li key={dev.id} className="flex items-center gap-2">
                     <UserAvatar name={dev.name} />

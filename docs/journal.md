@@ -2,6 +2,16 @@
 
 Registro de decisões e entregas do projeto: o que foi pedido, o que foi feito e por quê. Não substitui o `git log` (que tem o detalhe técnico de cada commit) nem o `README.md` (que descreve o sistema como ele é hoje); serve para explicar o raciocínio por trás das mudanças, na ordem em que aconteceram. Entradas mais novas no topo.
 
+## 2026-09-25 (continuação) — Barra lateral do detalhe: causa real achada com um navegador de verdade
+
+O usuário pediu para eu abrir o navegador e verificar. Não há ferramenta de navegador integrada aqui, mas o Edge está instalado: usei `puppeteer-core` (só o cliente, instalado fora do projeto) para renderizar a página, tirar print e medir cada elemento que passava da borda do pai. Isso resolveu em minutos o que três rodadas de suposições não resolveram.
+
+Causa real: a barra lateral tinha 288px, mas os campos dentro dela estavam com 425px — exatamente a largura do nome completo do desenvolvedor em uma linha ("avatar + Thamyris Aparecida Souza Bareicha de Abreu + Remover"). Um `display: grid` sem `grid-template-columns` cria uma coluna implícita `auto`, e o mínimo de uma coluna `auto` é o conteúdo em uma linha; `truncate`/`min-w-0` nos filhos não impedem isso, porque não mexem no tamanho da *coluna* do pai. Correção: `grid-cols-[minmax(0,1fr)]` nos grids do bloco de controles e do formulário empilhado (`ProjectUpdateForm`, layout `stack`). Sobrou ainda o botão "Atribuir" empurrado para fora porque o `SelectTrigger` tem `shrink-0` embutido; ele agora usa `min-w-0 flex-1 shrink`.
+
+Medido depois: zero elementos estourando em 931, 1024, 1280, 1440 e 1656px de largura. O `overflow-x-auto` que eu tinha posto como rede de segurança na rodada anterior foi removido — ele só escondia o problema e mascararia o próximo. O ponto de quebra `xl` da coluna lateral fica (em 1024px a coluna de 18rem ao lado do conteúdo ficaria apertada de qualquer jeito).
+
+Lição para o futuro: para bug visual, medir no navegador antes de teorizar; e em grid com conteúdo de largura imprevisível (nomes), sempre `minmax(0,1fr)` explícito.
+
 ## 2026-09-25 (continuação) — Terceira tentativa no corte da barra lateral: parei de adivinhar
 
 Segundo print do usuário, mesmo problema (nome de desenvolvedor cortado sem reticências, campos encostando na borda), mesmo depois da correção anterior. Sem um navegador de verdade para inspecionar, cheguei ao limite de deduzir a causa só lendo código e reagindo a prints — cada rodada corrigia uma hipótese plausível (e provavelmente real) sem garantia de ser a única.
