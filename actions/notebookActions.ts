@@ -6,6 +6,13 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { isStaffRole } from "@/lib/roles";
 import { deleteUploads, saveUploads, validateUploads } from "@/lib/uploads";
+import {
+  normalizeBlocks,
+  parseContent,
+  sameBlocks,
+  serializeBlocks,
+  type Block,
+} from "@/lib/wikiBlocks";
 
 // The internal wiki: a tree of Markdown pages, staff-only (never requesters
 // or guests). Anyone on staff may create, edit or delete any page — it is
@@ -40,7 +47,8 @@ export type NotebookAttachment = {
 export type NotebookPageDetail = {
   id: string;
   title: string;
-  content: string;
+  // the page body; pages written as Markdown come back converted
+  blocks: Block[];
   parentId: string | null;
   position: number;
   createdByName: string;
@@ -136,7 +144,7 @@ export async function getNotebookPage(
     data: {
       id: page.id,
       title: page.title,
-      content: page.content,
+      blocks: parseContent(page.content),
       parentId: page.parentId,
       position: page.position,
       createdByName: page.createdByName,
@@ -215,6 +223,10 @@ async function wouldCreateCycle(
 export async function updateNotebookPage(input: {
   id: string;
   title?: string;
+  // The body, as blocks (what the editor sends). `content` is the same thing
+  // as text (JSON of blocks, or Markdown), kept for callers that only have
+  // text; `blocks` wins when both are given.
+  blocks?: unknown;
   content?: string;
   // undefined leaves it, null moves to the root.
   parentId?: string | null;
@@ -253,8 +265,20 @@ export async function updateNotebookPage(input: {
     }
   }
 
+  let nextBlocks: Block[] | undefined;
+  if (input.blocks !== undefined) {
+    const valid = normalizeBlocks(input.blocks);
+    if (!valid) return { success: false, error: "Conteudo invalido" };
+    nextBlocks = valid;
+  } else if (input.content !== undefined) {
+    nextBlocks = parseContent(input.content);
+  }
+
+  // Compared without ids: a page still stored as Markdown gets new ids on
+  // every read, and saving it untouched must not count as an edit.
   const contentChanged =
-    input.content !== undefined && input.content !== page.content;
+    nextBlocks !== undefined &&
+    !sameBlocks(nextBlocks, parseContent(page.content));
   const titleChanged = title !== undefined && title !== page.title;
 
   await prisma.$transaction(async (tx) => {
@@ -262,7 +286,8 @@ export async function updateNotebookPage(input: {
       where: { id: page.id },
       data: {
         title,
-        content: input.content,
+        content:
+          contentChanged && nextBlocks ? serializeBlocks(nextBlocks) : undefined,
         parentId:
           input.parentId !== undefined ? input.parentId || null : undefined,
         position:
@@ -279,6 +304,24 @@ export async function updateNotebookPage(input: {
       });
     }
   });
+
+  // Images that were uploaded while editing but are no longer in the page
+  // (block deleted, edit abandoned earlier) go away with the save.
+  if (contentChanged && nextBlocks) {
+    const used = new Set(
+      nextBlocks.flatMap((block) => (block.url ? [block.url] : [])),
+    );
+    const orphans = await prisma.notebookPageAttachment.findMany({
+      where: { pageId: page.id, fileUrl: { notIn: [...used] } },
+      select: { id: true, fileUrl: true },
+    });
+    if (orphans.length) {
+      await prisma.notebookPageAttachment.deleteMany({
+        where: { id: { in: orphans.map((orphan) => orphan.id) } },
+      });
+      await deleteUploads(orphans.map((orphan) => orphan.fileUrl));
+    }
+  }
 
   refresh();
   return { success: true, data: undefined };

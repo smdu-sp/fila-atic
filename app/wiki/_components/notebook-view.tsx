@@ -1,22 +1,23 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ImagePlus, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import {
   addNotebookPageImage,
   deleteNotebookPage,
-  deleteNotebookPageAttachment,
   updateNotebookPage,
   type NotebookPageDetail,
   type NotebookTreeNode,
 } from "@/actions/notebookActions";
 import { CreatePageDialog } from "@/app/wiki/_components/create-page-dialog";
 import { NotebookTree } from "@/app/wiki/_components/notebook-tree";
-import { Markdown } from "@/components/markdown";
+import { BlockEditor } from "@/app/wiki/_components/block-editor";
+import { BlockView } from "@/app/wiki/_components/block-view";
+import { EmojiInput } from "@/components/emoji-picker";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -26,9 +27,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { formatFileSize, MAX_UPLOAD_SIZE } from "@/lib/uploadLimits";
+import { makeBlock, type Block } from "@/lib/wikiBlocks";
+import { trimTrailingEmpty } from "@/lib/wikiEditing";
 
 export function NotebookView({
   tree,
@@ -111,14 +111,19 @@ function PageBody({ page }: { page: NotebookPageDetail }) {
   const [isPending, startTransition] = useTransition();
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(page.title);
-  const [content, setContent] = useState(page.content);
+  // what the page shows; the editor works on `draft` until the save
+  const [blocks, setBlocks] = useState(page.blocks);
+  const [draft, setDraft] = useState<Block[]>([]);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [fileKey, setFileKey] = useState(0);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const startEdit = () => {
+    // an empty page starts with one empty line to type in
+    setDraft(blocks.length ? blocks : [makeBlock()]);
+    setEditing(true);
+  };
 
   const cancelEdit = () => {
     setTitle(page.title);
-    setContent(page.content);
     setEditing(false);
   };
 
@@ -129,17 +134,39 @@ function PageBody({ page }: { page: NotebookPageDetail }) {
       return;
     }
 
+    const next = trimTrailingEmpty(draft);
+
     startTransition(async () => {
       const result = await updateNotebookPage({
         id: page.id,
         title: trimmed,
-        content,
+        blocks: next,
       });
       if (!result.success) {
         toast.error(result.error);
         return;
       }
+      setBlocks(next);
       setEditing(false);
+      router.refresh();
+    });
+  };
+
+  // Ticking a to-do in the reader saves right away, like any other edit.
+  const toggleTodo = (id: string) => {
+    const previous = blocks;
+    const next = blocks.map((block) =>
+      block.id === id ? { ...block, checked: !block.checked } : block,
+    );
+    setBlocks(next);
+
+    startTransition(async () => {
+      const result = await updateNotebookPage({ id: page.id, blocks: next });
+      if (!result.success) {
+        setBlocks(previous);
+        toast.error(result.error);
+        return;
+      }
       router.refresh();
     });
   };
@@ -156,48 +183,18 @@ function PageBody({ page }: { page: NotebookPageDetail }) {
       router.push("/wiki");
     });
 
-  const insertImage = (file: File | undefined) => {
-    setFileKey((key) => key + 1);
-    if (!file) return;
+  const uploadImage = async (file: File) => {
+    const formData = new FormData();
+    formData.set("pageId", page.id);
+    formData.set("image", file);
 
-    if (file.size > MAX_UPLOAD_SIZE) {
-      toast.error(`Arquivo acima de ${MAX_UPLOAD_SIZE / 1024 / 1024} MB.`);
-      return;
+    const result = await addNotebookPageImage(formData);
+    if (!result.success) {
+      toast.error(result.error);
+      return null;
     }
-
-    startTransition(async () => {
-      const formData = new FormData();
-      formData.set("pageId", page.id);
-      formData.set("image", file);
-
-      const result = await addNotebookPageImage(formData);
-      if (!result.success) {
-        toast.error(result.error);
-        return;
-      }
-
-      const embed = `![${result.data.fileName}](${result.data.fileUrl})`;
-      const el = textareaRef.current;
-      if (el) {
-        const start = el.selectionStart ?? content.length;
-        const end = el.selectionEnd ?? content.length;
-        setContent(content.slice(0, start) + embed + content.slice(end));
-      } else {
-        setContent((current) => `${current}\n\n${embed}\n`);
-      }
-      router.refresh();
-    });
+    return { url: result.data.fileUrl, name: result.data.fileName };
   };
-
-  const removeAttachment = (attachmentId: string) =>
-    startTransition(async () => {
-      const result = await deleteNotebookPageAttachment(attachmentId);
-      if (!result.success) {
-        toast.error(result.error);
-        return;
-      }
-      router.refresh();
-    });
 
   return (
     <div className="grid gap-4">
@@ -224,14 +221,18 @@ function PageBody({ page }: { page: NotebookPageDetail }) {
       <div className="rounded-xl border border-border/60 bg-card p-4 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           {editing ? (
-            <Input
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              className="text-lg font-semibold"
-              aria-label="Título da página"
-            />
+            <div className="min-w-0 flex-1">
+              <EmojiInput
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                className="text-lg font-semibold"
+                aria-label="Título da página"
+              />
+            </div>
           ) : (
-            <h2 className="text-xl font-semibold">{page.title}</h2>
+            <h2 className="min-w-0 break-words text-xl font-semibold">
+              {page.title}
+            </h2>
           )}
           <div className="flex shrink-0 items-center gap-2">
             {editing ? (
@@ -245,11 +246,7 @@ function PageBody({ page }: { page: NotebookPageDetail }) {
               </>
             ) : (
               <>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setEditing(true)}
-                >
+                <Button size="sm" variant="outline" onClick={startEdit}>
                   <Pencil />
                   Editar
                 </Button>
@@ -275,83 +272,20 @@ function PageBody({ page }: { page: NotebookPageDetail }) {
 
         <div className="mt-4">
           {editing ? (
-            <div className="grid gap-2">
-              <Textarea
-                ref={textareaRef}
-                value={content}
-                onChange={(event) => setContent(event.target.value)}
-                rows={16}
-                placeholder="Escreva em Markdown: # títulos, listas, **negrito**, links, imagens..."
-                className="font-mono text-sm"
-              />
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={isPending}
-                  onClick={() =>
-                    document
-                      .getElementById(`notebook-image-${page.id}`)
-                      ?.click()
-                  }
-                >
-                  <ImagePlus />
-                  Inserir imagem
-                </Button>
-                <input
-                  key={fileKey}
-                  id={`notebook-image-${page.id}`}
-                  type="file"
-                  accept="image/*"
-                  hidden
-                  onChange={(event) => insertImage(event.target.files?.[0])}
-                />
-              </div>
-              {page.attachments.length ? (
-                <div className="grid gap-1.5 rounded-lg border border-border/60 p-2.5">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    Imagens enviadas nesta página
-                  </p>
-                  <ul className="grid gap-1">
-                    {page.attachments.map((attachment) => (
-                      <li
-                        key={attachment.id}
-                        className="flex items-center justify-between gap-2 text-xs"
-                      >
-                        <a
-                          href={attachment.fileUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="truncate hover:text-primary hover:underline"
-                        >
-                          {attachment.fileName} ·{" "}
-                          {formatFileSize(attachment.fileSize)}
-                        </a>
-                        <Button
-                          type="button"
-                          size="icon-xs"
-                          variant="ghost"
-                          aria-label={`Remover ${attachment.fileName}`}
-                          onClick={() => removeAttachment(attachment.id)}
-                        >
-                          <X />
-                        </Button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-            </div>
-          ) : page.content.trim() ? (
-            <Markdown content={page.content} />
+            <BlockEditor
+              blocks={draft}
+              onChange={setDraft}
+              onUploadImage={uploadImage}
+            />
+          ) : blocks.length ? (
+            <BlockView blocks={blocks} onToggleTodo={toggleTodo} />
           ) : (
             <p className="text-sm text-muted-foreground">
               Página vazia.{" "}
               <button
                 type="button"
                 className="text-primary hover:underline"
-                onClick={() => setEditing(true)}
+                onClick={startEdit}
               >
                 Escrever agora
               </button>

@@ -13,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+import { EmojiInput } from "@/components/emoji-picker";
 import { Label } from "@/components/ui/label";
 
 export function CreatePageDialog({
@@ -65,7 +65,7 @@ export function CreatePageDialog({
         </DialogHeader>
         <div className="grid gap-1.5">
           <Label htmlFor="notebook-page-title">Título</Label>
-          <Input
+          <EmojiInput
             id="notebook-page-title"
             autoFocus
             value={title}

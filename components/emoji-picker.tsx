@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ComponentProps } from "react";
+import { useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { SmileIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -153,11 +153,14 @@ export function EmojiButton({
   disabled = false,
   className,
   label = "Inserir emoji",
+  children,
 }: {
   onPick: (emoji: string) => void;
   disabled?: boolean;
   className?: string;
   label?: string;
+  // shown instead of the smiley (the callout block shows its own emoji)
+  children?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -175,7 +178,7 @@ export function EmojiButton({
           // keep the caret of the field: the button must not take the focus
           onMouseDown={(event) => event.preventDefault()}
         >
-          <SmileIcon />
+          {children ?? <SmileIcon />}
         </Button>
       </PopoverTrigger>
       <PopoverContent
