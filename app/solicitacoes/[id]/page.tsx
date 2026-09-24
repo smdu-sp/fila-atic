@@ -364,7 +364,7 @@ export default async function SolicitacaoDetalhePage({
               {/* Right sidebar: status/priority controls, team, reporter, dates. */}
               <aside className="grid min-w-0 content-start gap-4 lg:sticky lg:top-4">
                 {!isRequester ? (
-                  <div className="rounded-xl bg-sky-50 p-4 ring-1 ring-sky-200/70 dark:bg-sky-950/20 dark:ring-sky-900/40">
+                  <div className="min-w-0 rounded-xl bg-sky-50 p-4 ring-1 ring-sky-200/70 dark:bg-sky-950/20 dark:ring-sky-900/40">
                     <ProjectControls
                       projectId={details.id}
                       role={session?.user?.role ?? Role.REQUESTER}

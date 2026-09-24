@@ -2,6 +2,15 @@
 
 Registro de decisões e entregas do projeto: o que foi pedido, o que foi feito e por quê. Não substitui o `git log` (que tem o detalhe técnico de cada commit) nem o `README.md` (que descreve o sistema como ele é hoje); serve para explicar o raciocínio por trás das mudanças, na ordem em que aconteceram. Entradas mais novas no topo.
 
+## 2026-09-25 — Correção de verdade do corte na barra lateral do detalhe
+
+O usuário mandou um print: a barra lateral do detalhe do projeto continuava cortada na borda direita da tela mesmo depois da correção anterior. Dessa vez consegui ver o problema de verdade (nome de desenvolvedor longo, "Thamyris Aparecida Souza Bareicha de Ab" cortado sem reticências) em vez de só suspeitar.
+
+Causa raiz: `<Card>` e o bloco azul de controles são itens de um grid (`<aside className="grid ...">`) cuja coluna tem largura fixa (`20rem`). Uma coluna de grid com tamanho fixo não cresce, mas um item dentro dela sem `min-width: 0` também não encolhe — ele tenta ficar do tamanho do próprio conteúdo e simplesmente extrapola a célula, ficando visualmente cortado na borda da página. O `min-w-0` que já existia no `<aside>` e nos spans internos não ajudava, porque o `<Card>` e o `<div>` do bloco azul, no meio do caminho, não tinham o `min-w-0` deles. É a mesma classe de bug do modal de tarefa (`19365dd`) e da barra lateral do wiki, só que num lugar diferente da árvore.
+
+Correção: `min-w-0` no componente `Card` (`components/ui/card.tsx`) — para valer em qualquer grid/flex do sistema todo, não só aqui — e no `<div>` do bloco azul de controles, que não é um `Card`. Testado que as outras páginas que colocam `Card` dentro de um grid (`/relatorios`, `/fila`, `/projetos`, `/kanban`, `/wiki`) continuam respondendo normalmente.
+
+
 ## 2026-09-24 (continuação) — Correção: detalhe do projeto não cabia e estava tudo cinza
 
 Dois problemas relatados depois da fase 9, e os dois tinham a mesma raiz: eu troquei os antigos `<Card>` por `<div>` sem estilo ao reorganizar a página.
