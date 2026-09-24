@@ -55,3 +55,116 @@ export function averageDaysInStatus(
   }
   return result;
 }
+
+// ---------------------------------------------------------------------------
+// Timeline: how many requests were opened and finished per week (or per month
+// when the period is long), for the line charts.
+
+export type TimelineBucket = {
+  // first day of the bucket, "YYYY-MM-DD"
+  start: string;
+  // short text for the chart axis ("15/09" for weeks, "set/26" for months)
+  label: string;
+  created: number;
+  finished: number;
+};
+
+export type Timeline = {
+  granularity: "week" | "month";
+  buckets: TimelineBucket[];
+};
+
+const zoneFormat = (timeZone: string) =>
+  new Intl.DateTimeFormat("en-CA", { timeZone });
+
+// "YYYY-MM-DD" of an instant in the organisation's time zone.
+const dayKey = (date: Date, timeZone: string) => zoneFormat(timeZone).format(date);
+
+const parseDay = (key: string) => new Date(`${key}T00:00:00.000Z`);
+const toKey = (date: Date) => date.toISOString().slice(0, 10);
+
+// Monday of the week the day belongs to.
+function weekStart(key: string): string {
+  const date = parseDay(key);
+  const sinceMonday = (date.getUTCDay() + 6) % 7;
+  date.setUTCDate(date.getUTCDate() - sinceMonday);
+  return toKey(date);
+}
+
+const monthStart = (key: string) => `${key.slice(0, 7)}-01`;
+
+const addDays = (key: string, days: number) => {
+  const date = parseDay(key);
+  date.setUTCDate(date.getUTCDate() + days);
+  return toKey(date);
+};
+
+const nextMonth = (key: string) => {
+  const date = parseDay(key);
+  date.setUTCMonth(date.getUTCMonth() + 1);
+  return toKey(date);
+};
+
+const MONTHS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+
+const labelFor = (key: string, granularity: "week" | "month") =>
+  granularity === "week"
+    ? `${key.slice(8, 10)}/${key.slice(5, 7)}`
+    : `${MONTHS[Number(key.slice(5, 7)) - 1]}/${key.slice(2, 4)}`;
+
+const WEEKS_BY_DEFAULT = 12;
+// Beyond this many weeks the chart switches to months, to stay readable.
+const MAX_WEEKS = 26;
+
+// `from`/`to` bound the chart (`to` exclusive, like the report filters); with
+// no `from` it starts at the oldest event, or WEEKS_BY_DEFAULT weeks ago when
+// there is none. Days are counted in `timeZone`.
+export function buildTimeline(input: {
+  created: Date[];
+  finished: Date[];
+  from?: Date;
+  to?: Date;
+  now?: Date;
+  timeZone?: string;
+}): Timeline {
+  const timeZone = input.timeZone ?? "America/Sao_Paulo";
+  const now = input.now ?? new Date();
+  const today = dayKey(now, timeZone);
+
+  const createdDays = input.created.map((date) => dayKey(date, timeZone));
+  const finishedDays = input.finished.map((date) => dayKey(date, timeZone));
+
+  const endKey = input.to ? addDays(dayKey(input.to, timeZone), -1) : today;
+  const oldest = [...createdDays, ...finishedDays].sort()[0];
+  const startKey = input.from
+    ? dayKey(input.from, timeZone)
+    : (oldest ?? addDays(today, -7 * WEEKS_BY_DEFAULT));
+
+  const first = startKey <= endKey ? startKey : endKey;
+  const spanWeeks = Math.ceil(
+    (parseDay(endKey).getTime() - parseDay(first).getTime()) / (7 * 86_400_000),
+  );
+  const granularity = spanWeeks > MAX_WEEKS ? "month" : "week";
+  const bucketOf = granularity === "week" ? weekStart : monthStart;
+  const step = granularity === "week" ? (key: string) => addDays(key, 7) : nextMonth;
+
+  const buckets: TimelineBucket[] = [];
+  const index = new Map<string, TimelineBucket>();
+  for (let key = bucketOf(first); key <= endKey; key = step(key)) {
+    const bucket = { start: key, label: labelFor(key, granularity), created: 0, finished: 0 };
+    buckets.push(bucket);
+    index.set(key, bucket);
+  }
+
+  const count = (days: string[], field: "created" | "finished") => {
+    for (const day of days) {
+      if (day < first || day > endKey) continue;
+      const bucket = index.get(bucketOf(day));
+      if (bucket) bucket[field] += 1;
+    }
+  };
+  count(createdDays, "created");
+  count(finishedDays, "finished");
+
+  return { granularity, buckets };
+}

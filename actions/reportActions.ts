@@ -5,13 +5,14 @@ import {
   ProjectPriority,
   ProjectStatus,
   Role,
+  TaskStatus,
 } from "@prisma/client";
 
 import { getCurrentUser } from "@/lib/auth";
 import { todayInAppZone } from "@/lib/dueDate";
 import { dayRange } from "@/lib/listParams";
 import { prisma } from "@/lib/prisma";
-import { averageDaysInStatus } from "@/lib/reports";
+import { averageDaysInStatus, buildTimeline, type Timeline } from "@/lib/reports";
 import { isCoordination } from "@/lib/roles";
 import { CLOSED_TASK_STATUSES, DONE_TASK_STATUSES } from "@/lib/taskStatus";
 
@@ -40,6 +41,10 @@ export type GeneralReport = {
   // Average days spent in a status, from completed spans that started in the
   // period; a status a project has not yet left is not counted.
   avgDaysInStatus: Partial<Record<ProjectStatus, number>>;
+  // Requests opened and finished per week (or month) inside the period.
+  timeline: Timeline;
+  // Every task by its status right now (period does not apply).
+  tasksByStatus: Record<TaskStatus, number>;
   tasksCompletedInPeriod: number;
   tasksOpenNow: number;
   tasksOverdueNow: number;
@@ -75,8 +80,14 @@ export async function getGeneralReport(input: {
       : {};
   const today = todayInAppZone();
 
-  const [statusGroups, priorityGroups, categoryGroups, statusEvents] =
-    await Promise.all([
+  const [
+    statusGroups,
+    priorityGroups,
+    categoryGroups,
+    statusEvents,
+    createdProjects,
+    taskGroups,
+  ] = await Promise.all([
       prisma.project.groupBy({
         by: ["status"],
         where: createdWhere,
@@ -96,6 +107,11 @@ export async function getGeneralReport(input: {
         select: { projectId: true, toStatus: true, createdAt: true },
         orderBy: { createdAt: "asc" },
       }),
+      prisma.project.findMany({
+        where: createdWhere,
+        select: { createdAt: true },
+      }),
+      prisma.task.groupBy({ by: ["status"], _count: { _all: true } }),
     ]);
 
   const totalProjects = statusGroups.reduce(
@@ -119,6 +135,25 @@ export async function getGeneralReport(input: {
   } as Record<ProjectCategory | "NONE", number>;
   categoryGroups.forEach((row) => {
     byCategory[row.category ?? "NONE"] = row._count._all;
+  });
+
+  const tasksByStatus = zeroed(Object.values(TaskStatus));
+  taskGroups.forEach((row) => {
+    tasksByStatus[row.status] = row._count._all;
+  });
+
+  const timeline = buildTimeline({
+    created: createdProjects.map((project) => project.createdAt),
+    finished: statusEvents
+      .filter(
+        (event) =>
+          event.toStatus === ProjectStatus.FINISHED &&
+          (!range.gte || event.createdAt >= range.gte) &&
+          (!range.lt || event.createdAt < range.lt),
+      )
+      .map((event) => event.createdAt),
+    from: range.gte,
+    to: range.lt,
   });
 
   const avgDaysInStatus = averageDaysInStatus(statusEvents, {
@@ -192,6 +227,8 @@ export async function getGeneralReport(input: {
       byPriority,
       byCategory,
       avgDaysInStatus,
+      timeline,
+      tasksByStatus,
       tasksCompletedInPeriod,
       tasksOpenNow,
       tasksOverdueNow,

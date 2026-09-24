@@ -1,8 +1,12 @@
-import { ProjectStatus, Role } from "@prisma/client";
+import { ProjectPriority, ProjectStatus, Role, TaskStatus } from "@prisma/client";
 
 import { PageHeader } from "@/components/page-header";
 import { isCoordination } from "@/lib/roles";
-import { listDashboardCharts } from "@/actions/dashboardActions";
+import {
+  getDashboardMetrics,
+  listDashboardCharts,
+} from "@/actions/dashboardActions";
+import { listTaskStatusLabels } from "@/actions/taskStatusActions";
 import { listProjectLogs } from "@/actions/logActions";
 import { listProjects } from "@/actions/projectActions";
 import { listProjectRequestFields } from "@/actions/requestFormActions";
@@ -32,6 +36,18 @@ import {
 import Link from "next/link";
 import { getServerAuthSession } from "@/lib/auth";
 import { dueState } from "@/lib/dueDate";
+import {
+  BarsChart,
+  DonutChart,
+  StackedBarsChart,
+  TimelineChart,
+} from "@/components/charts";
+import {
+  PRIORITY_COLORS,
+  PROJECT_STATUS_COLORS,
+  SERIES_COLORS,
+  TASK_STATUS_COLORS,
+} from "@/lib/chartColors";
 import { CreateProjectForm } from "@/app/projetos/_components/create-project-form";
 import {
   getStatusBadgeClass,
@@ -42,14 +58,27 @@ import {
 } from "@/lib/projectLabels";
 
 export default async function Page() {
-  const [projectsResult, logsResult, chartsResult, fieldsResult, session] =
-    await Promise.all([
-      listProjects(),
-      listProjectLogs(),
-      listDashboardCharts(),
-      listProjectRequestFields(),
-      getServerAuthSession(),
-    ]);
+  const [
+    projectsResult,
+    logsResult,
+    chartsResult,
+    fieldsResult,
+    metricsResult,
+    taskLabelsResult,
+    session,
+  ] = await Promise.all([
+    listProjects(),
+    listProjectLogs(),
+    listDashboardCharts(),
+    listProjectRequestFields(),
+    getDashboardMetrics(),
+    listTaskStatusLabels(),
+    getServerAuthSession(),
+  ]);
+  const metrics = metricsResult.success ? metricsResult.data : null;
+  const taskLabels = taskLabelsResult.success
+    ? taskLabelsResult.data
+    : taskStatusLabels;
   const projects = projectsResult.success ? projectsResult.data : [];
   const logs = logsResult.success ? logsResult.data : [];
   const charts = chartsResult.success ? chartsResult.data : null;
@@ -106,9 +135,28 @@ export default async function Page() {
     },
   ];
 
+  const projectStatusSlices = Object.values(ProjectStatus).map((status) => ({
+    key: status,
+    label: statusLabels[status],
+    value: projects.filter((project) => project.status === status).length,
+    color: PROJECT_STATUS_COLORS[status],
+  }));
+  const prioritySlices = Object.values(ProjectPriority).map((priority) => ({
+    key: priority,
+    label: priorityLabels[priority],
+    value: projects.filter((project) => project.priority === priority).length,
+    color: PRIORITY_COLORS[priority],
+  }));
+  const taskStatusSlices = metrics
+    ? Object.values(TaskStatus).map((status) => ({
+        key: status,
+        label: taskLabels[status],
+        value: metrics.tasksByStatus[status],
+        color: TASK_STATUS_COLORS[status],
+      }))
+    : [];
+
   const recent = logs.slice(0, 5);
-  const maxValue = (items: Array<{ value: number }>) =>
-    Math.max(1, ...items.map((item) => item.value));
   const requesterOpenProjects = projects.filter(
     (project) =>
       project.status !== ProjectStatus.FINISHED &&
@@ -264,131 +312,151 @@ export default async function Page() {
                   ))}
                 </div>
 
-                {isCoordinator ? (
-                  <div className="mt-6 grid gap-4 xl:grid-cols-3">
-                    <Card className="bg-gradient-to-br from-muted/80 via-muted/60 to-background">
-                      <CardHeader>
-                        <CardTitle>Projetos por dev</CardTitle>
-                        <CardDescription>
-                          Distribuicao de solicitacoes.
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        {charts?.projectsByDeveloper.length ? (
-                          charts.projectsByDeveloper.map((item) => (
-                            <div key={item.label} className="space-y-1">
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="truncate font-medium">
-                                  {item.label}
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                  {item.value}
-                                </span>
-                              </div>
-                              <div className="h-2 w-full rounded-full bg-foreground/10">
-                                <div
-                                  className="h-2 rounded-full bg-primary"
-                                  style={{
-                                    width: `${Math.round(
-                                      (item.value /
-                                        maxValue(charts.projectsByDeveloper)) *
-                                        100,
-                                    )}%`,
-                                  }}
-                                />
-                              </div>
-                            </div>
-                          ))
-                        ) : (
-                          <p className="text-sm text-muted-foreground">
-                            Nenhum desenvolvedor alocado ainda.
-                          </p>
-                        )}
-                      </CardContent>
-                    </Card>
+                <div className="mt-6 grid gap-4 lg:grid-cols-2">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Projetos por status</CardTitle>
+                      <CardDescription>
+                        Onde está cada projeto agora.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <DonutChart
+                        slices={projectStatusSlices}
+                        totalLabel="projetos"
+                        emptyMessage="Nenhum projeto cadastrado."
+                      />
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>
+                        {metrics?.scope === "mine"
+                          ? "Minhas tarefas por status"
+                          : "Tarefas por status"}
+                      </CardTitle>
+                      <CardDescription>
+                        {metrics?.scope === "mine"
+                          ? "Tarefas atribuídas a você."
+                          : "Todas as tarefas do quadro."}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <DonutChart
+                        slices={taskStatusSlices}
+                        totalLabel="tarefas"
+                        emptyMessage="Nenhuma tarefa ainda."
+                      />
+                    </CardContent>
+                  </Card>
+                </div>
 
-                    <Card className="bg-gradient-to-br from-muted/80 via-muted/60 to-background">
-                      <CardHeader>
-                        <CardTitle>Solicitações abertas</CardTitle>
-                        <CardDescription>
-                          Principais solicitantes.
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        {charts?.openRequestsByUser.length ? (
-                          charts.openRequestsByUser.map((item) => (
-                            <div key={item.label} className="space-y-1">
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="truncate font-medium">
-                                  {item.label}
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                  {item.value}
-                                </span>
-                              </div>
-                              <div className="h-2 w-full rounded-full bg-foreground/10">
-                                <div
-                                  className="h-2 rounded-full bg-[linear-gradient(90deg,#0f3f9a,#0d7adf)]"
-                                  style={{
-                                    width: `${Math.round(
-                                      (item.value /
-                                        maxValue(charts.openRequestsByUser)) *
-                                        100,
-                                    )}%`,
-                                  }}
-                                />
-                              </div>
-                            </div>
-                          ))
-                        ) : (
-                          <p className="text-sm text-muted-foreground">
-                            Sem solicitacoes em aberto.
-                          </p>
-                        )}
-                      </CardContent>
-                    </Card>
+                {isCoordinator && metrics ? (
+                  <>
+                    <div className="mt-4 grid gap-4 xl:grid-cols-3">
+                      <Card className="xl:col-span-2">
+                        <CardHeader>
+                          <CardTitle>Solicitações por semana</CardTitle>
+                          <CardDescription>
+                            Abertas e finalizadas nas últimas 12 semanas.
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <TimelineChart
+                            points={(metrics.timeline?.buckets ?? []).map(
+                              (bucket) => ({
+                                label: bucket.label,
+                                created: bucket.created,
+                                finished: bucket.finished,
+                              }),
+                            )}
+                            series={[
+                              {
+                                key: "created",
+                                label: "Abertas",
+                                color: SERIES_COLORS.primary,
+                              },
+                              {
+                                key: "finished",
+                                label: "Finalizadas",
+                                color: SERIES_COLORS.positive,
+                              },
+                            ]}
+                            emptyMessage="Nenhuma solicitação nas últimas 12 semanas."
+                          />
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Projetos por prioridade</CardTitle>
+                          <CardDescription>
+                            Distribuição por nível de urgência.
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <BarsChart
+                            items={prioritySlices}
+                            labelWidth={70}
+                            emptyMessage="Nenhum projeto cadastrado."
+                          />
+                        </CardContent>
+                      </Card>
+                    </div>
 
-                    <Card className="bg-gradient-to-br from-muted/80 via-muted/60 to-background">
-                      <CardHeader>
-                        <CardTitle>Projetos por prioridade</CardTitle>
-                        <CardDescription>
-                          Distribuicao por nivel de urgência.
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        {charts?.projectsByPriority.length ? (
-                          charts.projectsByPriority.map((item) => (
-                            <div key={item.label} className="space-y-1">
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="truncate font-medium">
-                                  {item.label}
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                  {item.value}
-                                </span>
-                              </div>
-                              <div className="h-2 w-full rounded-full bg-foreground/10">
-                                <div
-                                  className="h-2 rounded-full bg-emerald-500"
-                                  style={{
-                                    width: `${Math.round(
-                                      (item.value /
-                                        maxValue(charts.projectsByPriority)) *
-                                        100,
-                                    )}%`,
-                                  }}
-                                />
-                              </div>
-                            </div>
-                          ))
-                        ) : (
-                          <p className="text-sm text-muted-foreground">
-                            Nenhum projeto cadastrado.
-                          </p>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </div>
+                    <div className="mt-4 grid gap-4 xl:grid-cols-3">
+                      <Card className="xl:col-span-2">
+                        <CardHeader>
+                          <CardTitle>Carga por desenvolvedor</CardTitle>
+                          <CardDescription>
+                            Tarefas em aberto agora, separando as atrasadas.
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <StackedBarsChart
+                            rows={(metrics.workload ?? []).map((dev) => ({
+                              label: dev.name,
+                              onTime: dev.open - dev.overdue,
+                              overdue: dev.overdue,
+                            }))}
+                            series={[
+                              {
+                                key: "onTime",
+                                label: "No prazo",
+                                color: SERIES_COLORS.primary,
+                              },
+                              {
+                                key: "overdue",
+                                label: "Atrasadas",
+                                color: SERIES_COLORS.danger,
+                              },
+                            ]}
+                            emptyMessage="Nenhuma tarefa em aberto."
+                          />
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Solicitações abertas</CardTitle>
+                          <CardDescription>
+                            Principais solicitantes.
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <BarsChart
+                            items={(charts?.openRequestsByUser ?? []).map(
+                              (item) => ({
+                                key: item.label,
+                                label: item.label,
+                                value: item.value,
+                                color: SERIES_COLORS.primary,
+                              }),
+                            )}
+                            emptyMessage="Sem solicitações em aberto."
+                          />
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </>
                 ) : null}
 
                 <div className="mt-6">
