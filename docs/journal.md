@@ -2,6 +2,14 @@
 
 Registro de decisões e entregas do projeto: o que foi pedido, o que foi feito e por quê. Não substitui o `git log` (que tem o detalhe técnico de cada commit) nem o `README.md` (que descreve o sistema como ele é hoje); serve para explicar o raciocínio por trás das mudanças, na ordem em que aconteceram. Entradas mais novas no topo.
 
+## 2026-09-24 — "Caderno" virou "Wiki"; reorganização por arrastar
+
+Duas coisas pedidas juntas antes da fase 9:
+
+- **Renomeado "Caderno" para "Wiki"** em tudo que o usuário vê: rota (`/caderno` → `/wiki`), menu lateral, títulos, textos, README. Os nomes internos (`NotebookPage`, `notebookActions.ts`, etc.) continuam em inglês como "Notebook" — mesmo critério já usado em "chamado" → "projeto": só o texto voltado à pessoa muda, não os identificadores internos. No caminho, um `mv`/`git mv` da pasta da rota falhou por permissão (o servidor de desenvolvimento do usuário estava rodando e segurando um handle na pasta); resolvido criando os arquivos no novo lugar e apagando os antigos um por um, em vez de renomear a pasta inteira.
+- **Reorganização por arrastar** na árvore da wiki: soltar uma página perto do topo ou do fundo de outra a reordena como irmã dela (em qualquer pai — arrastar entre páginas de pais diferentes já move e reordena em um passo só); soltar no meio de uma página a torna subpágina dela. A ação `reorderNotebookPage` (criada na fase 8 mas nunca usada pela interface) ganhou um `parentId` opcional para isso, com a mesma checagem de ciclo já usada em `updateNotebookPage`.
+- No caminho, um bug pequeno da fase 8: `refresh()` tentava revalidar uma rota aninhada (`/caderno/<id>`) que nunca existiu — a página sempre foi `/caderno?p=<id>`, um parâmetro de busca, não uma rota aninhada. Corrigido junto com a renomeação.
+
 ## 2026-09-23 (continuação) — Fase 8: caderno digital (wiki interna)
 
 Pedido: um "caderno digital estilo Notion" para templates, informações de servidores etc. Perguntei a profundidade antes de começar; a resposta foi "wiki simples" — páginas de texto rico organizadas em pastas, com histórico de quem editou. Ficou assim:

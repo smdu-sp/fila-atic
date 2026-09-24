@@ -1,12 +1,12 @@
 import { getNotebookPage, listNotebookTree } from "@/actions/notebookActions";
-import { NotebookView } from "@/app/caderno/_components/notebook-view";
+import { NotebookView } from "@/app/wiki/_components/notebook-view";
 import { AppSidebar } from "@/components/app-sidebar";
 import { PageHeader } from "@/components/page-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { requireRole } from "@/lib/auth";
 import { STAFF_ROLES } from "@/lib/roles";
 
-export default async function CadernoPage({
+export default async function WikiPage({
   searchParams,
 }: {
   searchParams: Promise<{ p?: string }>;
@@ -27,10 +27,10 @@ export default async function CadernoPage({
       <SidebarProvider>
         <AppSidebar />
         <SidebarInset className="min-w-0">
-          <PageHeader title="Caderno" />
+          <PageHeader title="Wiki" />
           <div className="grid w-full min-w-0 gap-6 bg-muted/50 p-4 pt-6 sm:p-6 sm:pt-4">
             <div className="flex flex-col gap-1">
-              <h1 className="text-2xl font-semibold">Caderno</h1>
+              <h1 className="text-2xl font-semibold">Wiki</h1>
               <p className="text-sm text-muted-foreground">
                 Wiki interna da equipe: templates, informações de servidores e o
                 que mais for útil manter registrado.

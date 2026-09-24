@@ -288,7 +288,7 @@ model ProjectRequestFieldValue {
   field     ProjectRequestField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
 }
 
-// Internal wiki ("caderno"): a tree of pages, Markdown content. Never shown
+// Internal wiki: a tree of pages, Markdown content. Never shown
 // to requesters. Deleting a page deletes its whole subtree (see
 // deleteNotebookPage, which also removes the files on disk first).
 model NotebookPage {

@@ -177,6 +177,79 @@ describe("pages", () => {
     expect(await titlesInOrder()).toEqual(["A", "B", "C"]);
   });
 
+  it("reparents a page (drag onto or between pages of a different parent) in one step", async () => {
+    const dev = await makeUser(Role.DEV_GLOBAL);
+    actAs(dev);
+    const root1 = await createNotebookPage({ title: "Root 1" });
+    const root2 = await createNotebookPage({ title: "Root 2" });
+    if (!root1.success || !root2.success) throw new Error("create failed");
+    const x = await createNotebookPage({ title: "X", parentId: root2.data });
+    const y = await createNotebookPage({ title: "Y", parentId: root2.data });
+    if (!x.success || !y.success) throw new Error("create failed");
+
+    // drop "into" root1: becomes its child, at the end
+    const intoResult = await reorderNotebookPage({
+      id: x.data,
+      parentId: root1.data,
+      beforeId: null,
+    });
+    expect(intoResult).toMatchObject({ success: true });
+    expect(
+      (await prisma.notebookPage.findUniqueOrThrow({ where: { id: x.data } }))
+        .parentId,
+    ).toBe(root1.data);
+
+    // drop "before" y, back under root2: reparents and positions in one call
+    const beforeResult = await reorderNotebookPage({
+      id: x.data,
+      parentId: root2.data,
+      beforeId: y.data,
+    });
+    expect(beforeResult).toMatchObject({ success: true });
+    const childrenOfRoot2 = await prisma.notebookPage.findMany({
+      where: { parentId: root2.data },
+      orderBy: { position: "asc" },
+      select: { title: true },
+    });
+    expect(childrenOfRoot2.map((p) => p.title)).toEqual(["X", "Y"]);
+
+    // and dropping in the tree's own empty space moves it to the root
+    const toRoot = await reorderNotebookPage({
+      id: x.data,
+      parentId: null,
+      beforeId: null,
+    });
+    expect(toRoot).toMatchObject({ success: true });
+    expect(
+      (await prisma.notebookPage.findUniqueOrThrow({ where: { id: x.data } }))
+        .parentId,
+    ).toBeNull();
+  });
+
+  it("never reparents a page into itself or one of its own descendants", async () => {
+    const dev = await makeUser(Role.DEV_GLOBAL);
+    actAs(dev);
+    const a = await createNotebookPage({ title: "A" });
+    if (!a.success) throw new Error("create failed");
+    const b = await createNotebookPage({ title: "B", parentId: a.data });
+    if (!b.success) throw new Error("create failed");
+
+    expect(
+      await reorderNotebookPage({
+        id: a.data,
+        parentId: a.data,
+        beforeId: null,
+      }),
+    ).toMatchObject({ success: false });
+    expect(
+      await reorderNotebookPage({
+        id: a.data,
+        parentId: b.data,
+        beforeId: null,
+      }),
+    ).toMatchObject({ success: false });
+  });
+
   it("deleting a page deletes its whole subtree and every file in it", async () => {
     const dev = await makeUser(Role.DEV_GLOBAL);
     actAs(dev);

@@ -62,8 +62,8 @@ const menuGeral = [
     roles: [Role.DEV_RESTRICTED, Role.DEV_GLOBAL, ...COORDINATION_ROLES],
   },
   {
-    title: "Caderno",
-    url: "/caderno",
+    title: "Wiki",
+    url: "/wiki",
     icon: BookOpenIcon,
     roles: STAFF_ROLES,
   },

@@ -3,7 +3,7 @@ import remarkGfm from "remark-gfm";
 
 import { cn } from "@/lib/utils";
 
-// Renders Markdown (the caderno's page format) with the app's own look
+// Renders Markdown (the wiki's page format) with the app's own look
 // instead of the browser's default: prose-sm plus a couple of overrides
 // (muted links, no stray margin at the top/bottom of the block).
 export function Markdown({

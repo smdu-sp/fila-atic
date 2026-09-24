@@ -7,9 +7,9 @@ import { prisma } from "@/lib/prisma";
 import { isStaffRole } from "@/lib/roles";
 import { deleteUploads, saveUploads, validateUploads } from "@/lib/uploads";
 
-// The internal wiki ("caderno"): a tree of Markdown pages, staff-only (never
-// requesters or guests). Anyone on staff may create, edit or delete any
-// page — it is meant to be maintained collectively, like a real wiki.
+// The internal wiki: a tree of Markdown pages, staff-only (never requesters
+// or guests). Anyone on staff may create, edit or delete any page — it is
+// meant to be maintained collectively, like a real wiki.
 
 type ActionResult<T> =
   { success: true; data: T } | { success: false; error: string };
@@ -62,9 +62,10 @@ async function staffOrError(): Promise<
   return { success: true, data: { id: user.id, name: user.name } };
 }
 
-function refresh(pageId?: string) {
-  revalidatePath("/caderno");
-  if (pageId) revalidatePath(`/caderno/${pageId}`);
+// The page lives at /wiki?p=<id>, a single route with a search param, not a
+// nested one, so revalidating the route itself covers every page.
+function refresh() {
+  revalidatePath("/wiki");
 }
 
 // The whole tree, flat: the client builds the hierarchy from parentId.
@@ -279,13 +280,20 @@ export async function updateNotebookPage(input: {
     }
   });
 
-  refresh(page.id);
+  refresh();
   return { success: true, data: undefined };
 }
 
+// Reorders a page among siblings, optionally moving it under a different
+// parent first (drag-and-drop in the tree: dropping a page "into" another
+// reparents it; dropping it "before/after" another places it as that page's
+// sibling, at that exact spot, even across parents, in one step).
 export async function reorderNotebookPage(input: {
   id: string;
-  // Sibling to place this page in front of; null for the end of the list.
+  // New parent to place the page under; undefined keeps its current one.
+  parentId?: string | null;
+  // Sibling (under the resulting parent) to place this page in front of;
+  // null for the end of the list.
   beforeId: string | null;
 }): Promise<ActionResult<void>> {
   const auth = await staffOrError();
@@ -297,8 +305,28 @@ export async function reorderNotebookPage(input: {
   });
   if (!page) return { success: false, error: "Pagina nao encontrada" };
 
+  const targetParentId =
+    input.parentId !== undefined ? input.parentId || null : page.parentId;
+
+  if (targetParentId === page.id) {
+    return { success: false, error: "Uma pagina nao pode ser pai dela mesma" };
+  }
+  if (targetParentId && targetParentId !== page.parentId) {
+    const parent = await prisma.notebookPage.findUnique({
+      where: { id: targetParentId },
+      select: { id: true },
+    });
+    if (!parent) return { success: false, error: "Pagina pai nao encontrada" };
+    if (await wouldCreateCycle(page.id, targetParentId)) {
+      return {
+        success: false,
+        error: "Nao e possivel mover uma pagina para dentro dela mesma",
+      };
+    }
+  }
+
   const siblings = await prisma.notebookPage.findMany({
-    where: { parentId: page.parentId, id: { not: page.id } },
+    where: { parentId: targetParentId, id: { not: page.id } },
     orderBy: { position: "asc" },
     select: { id: true, position: true },
   });
@@ -322,7 +350,7 @@ export async function reorderNotebookPage(input: {
 
   await prisma.notebookPage.update({
     where: { id: page.id },
-    data: { position },
+    data: { parentId: targetParentId, position },
   });
 
   refresh();
@@ -407,7 +435,7 @@ export async function addNotebookPageImage(
     },
   });
 
-  refresh(page.id);
+  refresh();
   return {
     success: true,
     data: { fileName: saved.fileName, fileUrl: saved.fileUrl },
@@ -429,7 +457,7 @@ export async function deleteNotebookPageAttachment(
   await prisma.notebookPageAttachment.delete({ where: { id: attachment.id } });
   await deleteUploads([attachment.fileUrl]);
 
-  refresh(attachment.pageId);
+  refresh();
   return { success: true, data: undefined };
 }
 

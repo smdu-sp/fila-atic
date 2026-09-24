@@ -14,8 +14,8 @@ import {
   type NotebookPageDetail,
   type NotebookTreeNode,
 } from "@/actions/notebookActions";
-import { CreatePageDialog } from "@/app/caderno/_components/create-page-dialog";
-import { NotebookTree } from "@/app/caderno/_components/notebook-tree";
+import { CreatePageDialog } from "@/app/wiki/_components/create-page-dialog";
+import { NotebookTree } from "@/app/wiki/_components/notebook-tree";
 import { Markdown } from "@/components/markdown";
 import { Button } from "@/components/ui/button";
 import {
@@ -71,7 +71,7 @@ export function NotebookView({
             <div className="grid gap-2">
               <p className="text-sm text-muted-foreground">
                 {tree.length === 0
-                  ? "O caderno está vazio. Crie a primeira página."
+                  ? "A wiki está vazia. Crie a primeira página."
                   : "Selecione uma página na lista ao lado."}
               </p>
               {tree.length === 0 ? (
@@ -94,7 +94,7 @@ export function NotebookView({
         onOpenChange={setCreateOpen}
         parentId={createParentId}
         parentTitle={parentTitle}
-        onCreated={(id) => router.push(`/caderno?p=${id}`)}
+        onCreated={(id) => router.push(`/wiki?p=${id}`)}
       />
     </div>
   );
@@ -153,7 +153,7 @@ function PageBody({ page }: { page: NotebookPageDetail }) {
         return;
       }
       toast.success("Página excluída.");
-      router.push("/caderno");
+      router.push("/wiki");
     });
 
   const insertImage = (file: File | undefined) => {
@@ -212,10 +212,7 @@ function PageBody({ page }: { page: NotebookPageDetail }) {
               {crumb.id === page.id ? (
                 <span>{crumb.title}</span>
               ) : (
-                <Link
-                  href={`/caderno?p=${crumb.id}`}
-                  className="hover:underline"
-                >
+                <Link href={`/wiki?p=${crumb.id}`} className="hover:underline">
                   {crumb.title}
                 </Link>
               )}

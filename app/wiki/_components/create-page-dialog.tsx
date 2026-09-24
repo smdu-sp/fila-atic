@@ -60,7 +60,7 @@ export function CreatePageDialog({
           <DialogDescription>
             {parentTitle
               ? `Criada como subpágina de "${parentTitle}".`
-              : "Criada no topo do caderno."}
+              : "Criada no topo da wiki."}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-1.5">
