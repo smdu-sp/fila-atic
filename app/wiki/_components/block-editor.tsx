@@ -21,6 +21,7 @@ import { toast } from "sonner";
 
 import {
   BLOCK_TEXT_CLASS,
+  InlineText,
   numberingOf,
 } from "@/app/wiki/_components/block-view";
 import { EmojiButton, insertTextAtCursor } from "@/components/emoji-picker";
@@ -38,6 +39,7 @@ import {
 import { cn } from "@/lib/utils";
 import { MAX_UPLOAD_SIZE } from "@/lib/uploadLimits";
 import {
+  hasInlineMarkup,
   isTextBlock,
   makeBlock,
   MAX_BLOCK_TEXT,
@@ -141,10 +143,12 @@ export function BlockEditor({ blocks, onChange, onUploadImage }: Props) {
   useEffect(() => {
     const request = pendingFocus.current;
     if (!request) return;
-    pendingFocus.current = null;
 
+    // a block that shows its formatted text has no field until it is focused:
+    // keep the request for the render that mounts it
     const element = fields.current.get(request.id);
     if (!element) return;
+    pendingFocus.current = null;
 
     element.focus();
     const at = request.caret === "end" ? element.value.length : request.caret;
@@ -155,6 +159,7 @@ export function BlockEditor({ blocks, onChange, onUploadImage }: Props) {
 
   const apply = (result: EditResult) => {
     pendingFocus.current = result.focus;
+    setFocusedId(result.focus.id);
     onChange(result.blocks);
   };
 
@@ -383,7 +388,29 @@ export function BlockEditor({ blocks, onChange, onUploadImage }: Props) {
     else fields.current.delete(id);
   };
 
-  const textarea = (block: Block, className?: string) => (
+  const textarea = (block: Block, className?: string) =>
+    focusedId !== block.id && hasInlineMarkup(block.text) ? (
+      // not being typed in: show the bold, italic, code and links
+      <div
+        tabIndex={0}
+        role="textbox"
+        aria-label={PLACEHOLDERS[block.type] ?? "Bloco de texto"}
+        aria-readonly
+        onClick={(event) => {
+          // a click on a link follows the link; anywhere else starts editing
+          if ((event.target as HTMLElement).closest("a")) return;
+          startEditing(block.id);
+        }}
+        onFocus={() => startEditing(block.id)}
+        className={cn(
+          "min-w-0 cursor-text whitespace-pre-wrap break-words",
+          BLOCK_TEXT_CLASS[block.type],
+          className,
+        )}
+      >
+        <InlineText text={block.text} />
+      </div>
+    ) : (
     <AutoTextarea
       value={block.text}
       registerRef={registerField(block.id)}
@@ -399,7 +426,13 @@ export function BlockEditor({ blocks, onChange, onUploadImage }: Props) {
       }}
       onBlur={() => setFocusedId((current) => (current === block.id ? null : current))}
     />
-  );
+    );
+
+  // Swap the formatted text for the field and put the cursor at the end.
+  const startEditing = (id: string) => {
+    pendingFocus.current = { id, caret: "end" };
+    setFocusedId(id);
+  };
 
   const content = (block: Block) => {
     switch (block.type) {
@@ -467,7 +500,7 @@ export function BlockEditor({ blocks, onChange, onUploadImage }: Props) {
               aria-label="Legenda da imagem"
               maxLength={200}
               onChange={(event) => replace(block.id, { ...block, text: event.target.value })}
-              className="w-full border-0 bg-transparent p-0 text-xs text-muted-foreground outline-none placeholder:text-muted-foreground/60"
+              className="w-full border-0 bg-transparent p-0 text-xs text-muted-foreground outline-none placeholder:text-muted-foreground/60 placeholder:opacity-0 focus:placeholder:opacity-100 group-hover/row:placeholder:opacity-100"
             />
           </figure>
         );
@@ -479,7 +512,14 @@ export function BlockEditor({ blocks, onChange, onUploadImage }: Props) {
     const remembered = lastFocused.current ? fields.current.get(lastFocused.current) : undefined;
     const fallback = [...blocks].reverse().find((block) => isTextBlock(block.type));
     const element = remembered ?? (fallback ? fields.current.get(fallback.id) : undefined);
-    if (element) insertTextAtCursor(element, emoji);
+    if (element) {
+      insertTextAtCursor(element, emoji);
+      return;
+    }
+
+    // no field on screen (the block shows its formatted text): append
+    const target = blocks.find((block) => block.id === lastFocused.current) ?? fallback;
+    if (target) replace(target.id, { ...target, text: target.text + emoji });
   };
 
   const addBlock = (type: BlockType) => {
@@ -494,7 +534,7 @@ export function BlockEditor({ blocks, onChange, onUploadImage }: Props) {
   };
 
   return (
-    <div className="grid min-w-0 gap-2">
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2">
       <div className="flex flex-wrap items-center gap-1 rounded-lg border border-border/60 bg-muted/40 p-1">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -541,7 +581,7 @@ export function BlockEditor({ blocks, onChange, onUploadImage }: Props) {
         />
       </div>
 
-      <div className="grid min-w-0 gap-0.5" onDragEnd={() => setDrag(null)}>
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-0.5" onDragEnd={() => setDrag(null)}>
         {blocks.map((block) => {
           const entries = focusedId === block.id && slashDismissed !== block.text ? slashEntries(block) : null;
           const dropping = drag?.overId === block.id && drag.id !== block.id;

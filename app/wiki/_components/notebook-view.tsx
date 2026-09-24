@@ -1,9 +1,15 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -16,7 +22,6 @@ import {
 import { CreatePageDialog } from "@/app/wiki/_components/create-page-dialog";
 import { NotebookTree } from "@/app/wiki/_components/notebook-tree";
 import { BlockEditor } from "@/app/wiki/_components/block-editor";
-import { BlockView } from "@/app/wiki/_components/block-view";
 import { EmojiInput } from "@/components/emoji-picker";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,7 +33,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { makeBlock, type Block } from "@/lib/wikiBlocks";
-import { trimTrailingEmpty } from "@/lib/wikiEditing";
+import { EDIT_CONFLICT_ERROR, trimTrailingEmpty } from "@/lib/wikiEditing";
 
 export function NotebookView({
   tree,
@@ -51,7 +56,7 @@ export function NotebookView({
 
   return (
     <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
-      <aside className="grid content-start gap-2 rounded-xl bg-muted/70 p-2 lg:h-fit lg:sticky lg:top-4">
+      <aside className="grid grid-cols-[minmax(0,1fr)] content-start gap-2 rounded-xl bg-muted/70 p-2 lg:h-fit lg:sticky lg:top-4">
         <Button size="sm" onClick={() => openCreate(null)}>
           <Plus />
           Nova página
@@ -106,73 +111,190 @@ const formatDateTime = (value: Date | string) =>
     timeStyle: "short",
   });
 
+// The page is always editable; changes are saved on their own a moment after
+// the last keystroke.
+const AUTOSAVE_MS = 1200;
+
+type SaveStatus =
+  | { kind: "idle" }
+  | { kind: "dirty" }
+  | { kind: "saving" }
+  | { kind: "saved"; at: Date }
+  | { kind: "invalid" }
+  | { kind: "conflict" }
+  | { kind: "error"; message: string };
+
+function SaveIndicator({
+  status,
+  onRetry,
+}: {
+  status: SaveStatus;
+  onRetry: () => void;
+}) {
+  switch (status.kind) {
+    case "dirty":
+      return <span>Alterações pendentes…</span>;
+    case "saving":
+      return <span>Salvando…</span>;
+    case "saved":
+      return (
+        <span>
+          Salvo às{" "}
+          {status.at.toLocaleTimeString("pt-BR", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+        </span>
+      );
+    case "invalid":
+      return <span className="text-destructive">Informe o título para salvar.</span>;
+    case "error":
+      return (
+        <span className="text-destructive">
+          Não foi possível salvar ({status.message}).{" "}
+          <button type="button" className="underline" onClick={onRetry}>
+            Tentar de novo
+          </button>
+        </span>
+      );
+    default:
+      return <span>As alterações são salvas automaticamente.</span>;
+  }
+}
+
 function PageBody({ page }: { page: NotebookPageDetail }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(page.title);
-  // what the page shows; the editor works on `draft` until the save
-  const [blocks, setBlocks] = useState(page.blocks);
-  const [draft, setDraft] = useState<Block[]>([]);
+  // an empty page starts with one empty line to type in
+  const [blocks, setBlocks] = useState(() =>
+    page.blocks.length ? page.blocks : [makeBlock()],
+  );
+  const [status, setStatus] = useState<SaveStatus>({ kind: "idle" });
   const [deleteOpen, setDeleteOpen] = useState(false);
 
-  const startEdit = () => {
-    // an empty page starts with one empty line to type in
-    setDraft(blocks.length ? blocks : [makeBlock()]);
-    setEditing(true);
-  };
+  // What the save needs, kept in refs so the timer and the unmount cleanup
+  // always see the latest values.
+  const latest = useRef({ title: page.title, blocks });
+  const version = useRef(page.version);
+  const knownTitle = useRef(page.title);
+  const dirty = useRef(false);
+  const inFlight = useRef(false);
+  const conflict = useRef(false);
+  const overwrite = useRef(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const flushRef = useRef<() => Promise<void>>(async () => undefined);
 
-  const cancelEdit = () => {
-    setTitle(page.title);
-    setEditing(false);
-  };
+  const flush = useCallback(async () => {
+    clearTimeout(timer.current);
+    if (!dirty.current || inFlight.current || conflict.current) return;
 
-  const save = () => {
-    const trimmed = title.trim();
-    if (!trimmed) {
-      toast.error("Informe o título.");
+    const current = latest.current;
+    if (!current.title.trim()) {
+      setStatus({ kind: "invalid" });
       return;
     }
 
-    const next = trimTrailingEmpty(draft);
+    dirty.current = false;
+    inFlight.current = true;
+    setStatus({ kind: "saving" });
 
-    startTransition(async () => {
-      const result = await updateNotebookPage({
-        id: page.id,
-        title: trimmed,
-        blocks: next,
-      });
-      if (!result.success) {
-        toast.error(result.error);
-        return;
-      }
-      setBlocks(next);
-      setEditing(false);
-      router.refresh();
+    const result = await updateNotebookPage({
+      id: page.id,
+      title: current.title,
+      blocks: trimTrailingEmpty(current.blocks),
+      expectedVersion: overwrite.current ? undefined : version.current,
+      autosave: true,
     });
+    inFlight.current = false;
+
+    if (result.success) {
+      overwrite.current = false;
+      version.current = result.data.version;
+      // the page list on the left shows the title
+      if (current.title.trim() !== knownTitle.current) {
+        knownTitle.current = current.title.trim();
+        router.refresh();
+      }
+      if (dirty.current) {
+        // typed more while saving
+        timer.current = setTimeout(() => void flushRef.current(), 0);
+      } else {
+        setStatus({ kind: "saved", at: new Date() });
+      }
+      return;
+    }
+
+    dirty.current = true;
+    if (result.error === EDIT_CONFLICT_ERROR) {
+      conflict.current = true;
+      setStatus({ kind: "conflict" });
+    } else {
+      setStatus({ kind: "error", message: result.error });
+    }
+  }, [page.id, router]);
+
+  useEffect(() => {
+    flushRef.current = flush;
+  }, [flush]);
+
+  const changed = () => {
+    dirty.current = true;
+    if (conflict.current) return;
+
+    setStatus({ kind: "dirty" });
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => void flushRef.current(), AUTOSAVE_MS);
   };
 
-  // Ticking a to-do in the reader saves right away, like any other edit.
-  const toggleTodo = (id: string) => {
-    const previous = blocks;
-    const next = blocks.map((block) =>
-      block.id === id ? { ...block, checked: !block.checked } : block,
-    );
-    setBlocks(next);
+  const onTitleChange = (value: string) => {
+    setTitle(value);
+    latest.current = { ...latest.current, title: value };
+    changed();
+  };
 
-    startTransition(async () => {
-      const result = await updateNotebookPage({ id: page.id, blocks: next });
-      if (!result.success) {
-        setBlocks(previous);
-        toast.error(result.error);
-        return;
-      }
-      router.refresh();
-    });
+  const onBlocksChange = (next: Block[]) => {
+    setBlocks(next);
+    latest.current = { ...latest.current, blocks: next };
+    changed();
+  };
+
+  // Leaving the page (another wiki page, another screen) saves what is pending.
+  useEffect(
+    () => () => {
+      clearTimeout(timer.current);
+      if (dirty.current && !conflict.current) void flushRef.current();
+    },
+    [],
+  );
+
+  // Closing the tab with unsaved changes asks first.
+  useEffect(() => {
+    const warn = (event: BeforeUnloadEvent) => {
+      if (dirty.current || inFlight.current) event.preventDefault();
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, []);
+
+  const saveOverMine = () => {
+    conflict.current = false;
+    overwrite.current = true;
+    dirty.current = true;
+    void flush();
+  };
+
+  const retry = () => {
+    dirty.current = true;
+    void flush();
   };
 
   const remove = () =>
     startTransition(async () => {
+      // nothing to save on a page that is going away
+      clearTimeout(timer.current);
+      dirty.current = false;
+
       const result = await deleteNotebookPage(page.id);
       if (!result.success) {
         toast.error(result.error);
@@ -197,7 +319,7 @@ function PageBody({ page }: { page: NotebookPageDetail }) {
   };
 
   return (
-    <div className="grid gap-4">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
       {page.breadcrumbs.length > 1 ? (
         <nav
           aria-label="Caminho"
@@ -218,49 +340,49 @@ function PageBody({ page }: { page: NotebookPageDetail }) {
         </nav>
       ) : null}
 
+      {status.kind === "conflict" ? (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100"
+        >
+          <span>
+            Outra pessoa salvou esta página enquanto você editava. Suas
+            alterações ainda não foram salvas.
+          </span>
+          <span className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => window.location.reload()}
+            >
+              Recarregar a versão dela
+            </Button>
+            <Button size="sm" onClick={saveOverMine}>
+              Salvar a minha por cima
+            </Button>
+          </span>
+        </div>
+      ) : null}
+
       <div className="rounded-xl border border-border/60 bg-card p-4 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          {editing ? (
-            <div className="min-w-0 flex-1">
-              <EmojiInput
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                className="text-lg font-semibold"
-                aria-label="Título da página"
-              />
-            </div>
-          ) : (
-            <h2 className="min-w-0 break-words text-xl font-semibold">
-              {page.title}
-            </h2>
-          )}
-          <div className="flex shrink-0 items-center gap-2">
-            {editing ? (
-              <>
-                <Button size="sm" variant="ghost" onClick={cancelEdit}>
-                  Cancelar
-                </Button>
-                <Button size="sm" onClick={save} disabled={isPending}>
-                  {isPending ? "Salvando" : "Salvar"}
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button size="sm" variant="outline" onClick={startEdit}>
-                  <Pencil />
-                  Editar
-                </Button>
-                <Button
-                  size="icon-sm"
-                  variant="outline"
-                  aria-label="Excluir página"
-                  onClick={() => setDeleteOpen(true)}
-                >
-                  <Trash2 />
-                </Button>
-              </>
-            )}
+          <div className="min-w-0 flex-1">
+            <EmojiInput
+              value={title}
+              onChange={(event) => onTitleChange(event.target.value)}
+              placeholder="Título da página"
+              className="h-auto border-transparent bg-transparent px-0 py-0 text-xl font-semibold shadow-none hover:border-input focus-visible:border-ring md:text-xl"
+              aria-label="Título da página"
+            />
           </div>
+          <Button
+            size="icon-sm"
+            variant="outline"
+            aria-label="Excluir página"
+            onClick={() => setDeleteOpen(true)}
+          >
+            <Trash2 />
+          </Button>
         </div>
 
         <p className="mt-1 text-xs text-muted-foreground">
@@ -269,29 +391,20 @@ function PageBody({ page }: { page: NotebookPageDetail }) {
             ? ` · Editada por ${page.updatedByName} em ${formatDateTime(page.updatedAt)}`
             : ""}
         </p>
+        <p
+          className="mt-0.5 text-xs text-muted-foreground"
+          role="status"
+          aria-live="polite"
+        >
+          <SaveIndicator status={status} onRetry={retry} />
+        </p>
 
         <div className="mt-4">
-          {editing ? (
-            <BlockEditor
-              blocks={draft}
-              onChange={setDraft}
-              onUploadImage={uploadImage}
-            />
-          ) : blocks.length ? (
-            <BlockView blocks={blocks} onToggleTodo={toggleTodo} />
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Página vazia.{" "}
-              <button
-                type="button"
-                className="text-primary hover:underline"
-                onClick={startEdit}
-              >
-                Escrever agora
-              </button>
-              .
-            </p>
-          )}
+          <BlockEditor
+            blocks={blocks}
+            onChange={onBlocksChange}
+            onUploadImage={uploadImage}
+          />
         </div>
       </div>
 

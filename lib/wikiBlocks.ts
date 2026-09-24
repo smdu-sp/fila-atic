@@ -277,3 +277,7 @@ export function parseInline(text: string): InlineNode[] {
   pushText(text.slice(last));
   return nodes;
 }
+
+// Whether the text uses any inline markup (so it is worth drawing formatted).
+export const hasInlineMarkup = (text: string) =>
+  parseInline(text).some((node) => node.type !== "text");

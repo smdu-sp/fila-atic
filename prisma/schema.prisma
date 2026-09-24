@@ -315,6 +315,9 @@ model NotebookPage {
   createdById   String
   createdByName String
   updatedByName String
+  // +1 on every save that changes the title or the body (see the editor's
+  // conflict check); moving the page in the tree does not count.
+  version       Int                      @default(0)
   createdAt     DateTime                 @default(now())
   updatedAt     DateTime                 @updatedAt
   revisions     NotebookPageRevision[]

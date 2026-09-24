@@ -115,7 +115,7 @@ export function NotebookTree({
 
   return (
     <ul
-      className="grid gap-0.5"
+      className="grid grid-cols-[minmax(0,1fr)] gap-0.5"
       onDragOver={(event) => {
         // Empty space below the last item: move to the root, at the end.
         if (draggingId) event.preventDefault();
@@ -247,7 +247,7 @@ function TreeItem({
         ) : null}
       </div>
       {node.children.length ? (
-        <ul className="grid gap-0.5">
+        <ul className="grid grid-cols-[minmax(0,1fr)] gap-0.5">
           {node.children.map((child) => (
             <TreeItem
               key={child.id}

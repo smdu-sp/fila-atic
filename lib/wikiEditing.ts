@@ -224,3 +224,10 @@ export function trimTrailingEmpty(blocks: Block[]): Block[] {
   }
   return blocks.slice(0, end);
 }
+
+// Error text of updateNotebookPage when someone else saved the page since the
+// editor loaded it (the editor recognizes it to offer reload / overwrite).
+export const EDIT_CONFLICT_ERROR = "CONFLITO_DE_EDICAO";
+
+// An autosave folds into the author's previous revision when it is this recent.
+export const REVISION_WINDOW_MS = 10 * 60_000;

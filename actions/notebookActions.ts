@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { isStaffRole } from "@/lib/roles";
 import { deleteUploads, saveUploads, validateUploads } from "@/lib/uploads";
+import { EDIT_CONFLICT_ERROR, REVISION_WINDOW_MS } from "@/lib/wikiEditing";
 import {
   normalizeBlocks,
   parseContent,
@@ -49,6 +50,8 @@ export type NotebookPageDetail = {
   title: string;
   // the page body; pages written as Markdown come back converted
   blocks: Block[];
+  // see updateNotebookPage's expectedVersion
+  version: number;
   parentId: string | null;
   position: number;
   createdByName: string;
@@ -145,6 +148,7 @@ export async function getNotebookPage(
       id: page.id,
       title: page.title,
       blocks: parseContent(page.content),
+      version: page.version,
       parentId: page.parentId,
       position: page.position,
       createdByName: page.createdByName,
@@ -230,15 +234,27 @@ export async function updateNotebookPage(input: {
   content?: string;
   // undefined leaves it, null moves to the root.
   parentId?: string | null;
-}): Promise<ActionResult<void>> {
+  // The version the editor last saw (from getNotebookPage or the previous
+  // save). If the page moved on, nothing is saved and the answer is
+  // EDIT_CONFLICT_ERROR; leave it out to save over whatever is there.
+  expectedVersion?: number;
+  // Set by the editor's automatic saves: they fold into the author's previous
+  // revision when it is recent, and only clean up old orphan images (a fresh
+  // upload may not be in the page yet).
+  autosave?: boolean;
+}): Promise<ActionResult<{ version: number }>> {
   const auth = await staffOrError();
   if (!auth.success) return auth;
 
   const page = await prisma.notebookPage.findUnique({
     where: { id: String(input.id ?? "") },
-    select: { id: true, title: true, content: true },
+    select: { id: true, title: true, content: true, version: true },
   });
   if (!page) return { success: false, error: "Pagina nao encontrada" };
+
+  if (input.expectedVersion !== undefined && input.expectedVersion !== page.version) {
+    return { success: false, error: EDIT_CONFLICT_ERROR };
+  }
 
   const title = input.title !== undefined ? input.title.trim() : undefined;
   if (title !== undefined && !title) {
@@ -281,28 +297,51 @@ export async function updateNotebookPage(input: {
     !sameBlocks(nextBlocks, parseContent(page.content));
   const titleChanged = title !== undefined && title !== page.title;
 
-  await prisma.$transaction(async (tx) => {
-    await tx.notebookPage.update({
+  const edited = contentChanged || titleChanged;
+  const moved = input.parentId !== undefined;
+
+  const saved = await prisma.$transaction(async (tx) => {
+    const updated = await tx.notebookPage.update({
       where: { id: page.id },
       data: {
         title,
         content:
           contentChanged && nextBlocks ? serializeBlocks(nextBlocks) : undefined,
-        parentId:
-          input.parentId !== undefined ? input.parentId || null : undefined,
-        position:
-          input.parentId !== undefined
-            ? await nextPosition(input.parentId || null)
-            : undefined,
-        updatedByName: auth.data.name,
+        parentId: moved ? input.parentId || null : undefined,
+        position: moved ? await nextPosition(input.parentId || null) : undefined,
+        // a save that changes nothing is not an edit
+        updatedByName: edited || moved ? auth.data.name : undefined,
+        version: edited ? { increment: 1 } : undefined,
       },
+      select: { version: true },
     });
 
-    if (contentChanged || titleChanged) {
-      await tx.notebookPageRevision.create({
-        data: { pageId: page.id, editedByName: auth.data.name },
-      });
+    if (edited) {
+      const last = input.autosave
+        ? await tx.notebookPageRevision.findFirst({
+            where: { pageId: page.id },
+            orderBy: { editedAt: "desc" },
+            select: { id: true, editedByName: true, editedAt: true },
+          })
+        : null;
+
+      if (
+        last &&
+        last.editedByName === auth.data.name &&
+        Date.now() - last.editedAt.getTime() < REVISION_WINDOW_MS
+      ) {
+        await tx.notebookPageRevision.update({
+          where: { id: last.id },
+          data: { editedAt: new Date() },
+        });
+      } else {
+        await tx.notebookPageRevision.create({
+          data: { pageId: page.id, editedByName: auth.data.name },
+        });
+      }
     }
+
+    return updated;
   });
 
   // Images that were uploaded while editing but are no longer in the page
@@ -312,7 +351,13 @@ export async function updateNotebookPage(input: {
       nextBlocks.flatMap((block) => (block.url ? [block.url] : [])),
     );
     const orphans = await prisma.notebookPageAttachment.findMany({
-      where: { pageId: page.id, fileUrl: { notIn: [...used] } },
+      where: {
+        pageId: page.id,
+        fileUrl: { notIn: [...used] },
+        ...(input.autosave
+          ? { createdAt: { lt: new Date(Date.now() - REVISION_WINDOW_MS) } }
+          : {}),
+      },
       select: { id: true, fileUrl: true },
     });
     if (orphans.length) {
@@ -324,7 +369,7 @@ export async function updateNotebookPage(input: {
   }
 
   refresh();
-  return { success: true, data: undefined };
+  return { success: true, data: { version: saved.version } };
 }
 
 // Reorders a page among siblings, optionally moving it under a different

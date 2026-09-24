@@ -5,10 +5,12 @@ import {
   addNotebookPageImage,
   createNotebookPage,
   getNotebookPage,
+  reorderNotebookPage,
   updateNotebookPage,
 } from "@/actions/notebookActions";
 import { deleteUploads } from "@/lib/uploads";
 import { serializeBlocks, type Block } from "@/lib/wikiBlocks";
+import { EDIT_CONFLICT_ERROR } from "@/lib/wikiEditing";
 import { actAs, makeUser, prisma, resetDb } from "../helpers";
 
 vi.mock("@/lib/uploads", async (importOriginal) => {
@@ -219,5 +221,100 @@ describe("images inside blocks", () => {
     expect(await prisma.notebookPageAttachment.count()).toBe(1);
     expect(vi.mocked(deleteUploads)).not.toHaveBeenCalled();
     expect(await blocksOf(id)).toHaveLength(1);
+  });
+});
+
+describe("editing conflicts", () => {
+  it("counts a version per save that changes title or body, and returns it", async () => {
+    const { id } = await newPage();
+    const first = await updateNotebookPage({ id, blocks: [{ id: "a", type: "paragraph", text: "v1" }] });
+    expect(first).toMatchObject({ success: true, data: { version: 1 } });
+
+    // nothing changed: same version
+    expect(await updateNotebookPage({ id, blocks: [{ id: "a", type: "paragraph", text: "v1" }] })).toMatchObject({ data: { version: 1 } });
+    expect(await updateNotebookPage({ id, title: "Outro" })).toMatchObject({ data: { version: 2 } });
+
+    const details = await getNotebookPage(id);
+    expect(details.success && details.data.version).toBe(2);
+  });
+
+  it("refuses a save made on top of an older version, leaving the page untouched", async () => {
+    const { id } = await newPage();
+    await updateNotebookPage({ id, blocks: [{ id: "a", type: "paragraph", text: "minha" }], expectedVersion: 0 });
+
+    // someone else saves in the meantime
+    const other = await makeUser(Role.COORDINATOR);
+    actAs(other);
+    await updateNotebookPage({ id, blocks: [{ id: "a", type: "paragraph", text: "dela" }], expectedVersion: 1 });
+
+    const stale = await updateNotebookPage({ id, blocks: [{ id: "a", type: "paragraph", text: "minha de novo" }], expectedVersion: 1 });
+    expect(stale).toMatchObject({ success: false, error: EDIT_CONFLICT_ERROR });
+    expect((await blocksOf(id))[0].text).toBe("dela");
+
+    // without expectedVersion the caller chooses to overwrite
+    expect(await updateNotebookPage({ id, blocks: [{ id: "a", type: "paragraph", text: "por cima" }] })).toMatchObject({ success: true });
+  });
+
+  it("moving the page in the tree does not invalidate an open editor", async () => {
+    const { id } = await newPage();
+    const parent = await createNotebookPage({ title: "Pai" });
+    if (!parent.success) throw new Error("create failed");
+    await updateNotebookPage({ id, blocks: [{ id: "a", type: "paragraph", text: "x" }] });
+
+    await reorderNotebookPage({ id, parentId: parent.data, beforeId: null });
+
+    expect(await updateNotebookPage({ id, blocks: [{ id: "a", type: "paragraph", text: "y" }], expectedVersion: 1 })).toMatchObject({ success: true });
+  });
+});
+
+describe("autosave", () => {
+  it("folds saves by the same author into one recent revision, but not another author's", async () => {
+    const { id } = await newPage();
+
+    await updateNotebookPage({ id, blocks: [{ id: "a", type: "paragraph", text: "1" }], autosave: true });
+    await updateNotebookPage({ id, blocks: [{ id: "a", type: "paragraph", text: "12" }], autosave: true });
+    await updateNotebookPage({ id, blocks: [{ id: "a", type: "paragraph", text: "123" }], autosave: true });
+    expect(await prisma.notebookPageRevision.count()).toBe(1);
+
+    const other = await makeUser(Role.DEV_RESTRICTED);
+    actAs(other);
+    await updateNotebookPage({ id, blocks: [{ id: "a", type: "paragraph", text: "1234" }], autosave: true });
+    expect(await prisma.notebookPageRevision.count()).toBe(2);
+  });
+
+  it("starts a new revision once the previous one is old", async () => {
+    const { id } = await newPage();
+    await updateNotebookPage({ id, blocks: [{ id: "a", type: "paragraph", text: "1" }], autosave: true });
+    await prisma.notebookPageRevision.updateMany({ data: { editedAt: new Date(Date.now() - 11 * 60_000) } });
+
+    await updateNotebookPage({ id, blocks: [{ id: "a", type: "paragraph", text: "12" }], autosave: true });
+    expect(await prisma.notebookPageRevision.count()).toBe(2);
+  });
+
+  it("does not delete an image uploaded a moment ago that is not in the saved blocks yet", async () => {
+    const { id } = await newPage();
+    await upload(id, "recente.png");
+
+    await updateNotebookPage({ id, blocks: [{ id: "a", type: "paragraph", text: "texto" }], autosave: true });
+    expect(await prisma.notebookPageAttachment.count()).toBe(1);
+    expect(vi.mocked(deleteUploads)).not.toHaveBeenCalled();
+
+    // an old orphan does go
+    await prisma.notebookPageAttachment.updateMany({ data: { createdAt: new Date(Date.now() - 11 * 60_000) } });
+    await updateNotebookPage({ id, blocks: [{ id: "a", type: "paragraph", text: "texto 2" }], autosave: true });
+    expect(await prisma.notebookPageAttachment.count()).toBe(0);
+  });
+
+  it("a save that changes nothing does not mark the page as edited by that person", async () => {
+    const { id } = await newPage();
+    await updateNotebookPage({ id, blocks: [{ id: "a", type: "paragraph", text: "x" }] });
+    const before = await prisma.notebookPage.findUniqueOrThrow({ where: { id } });
+
+    const other = await makeUser(Role.DEV_GLOBAL);
+    actAs(other);
+    await updateNotebookPage({ id, blocks: [{ id: "a", type: "paragraph", text: "x" }], autosave: true });
+
+    const after = await prisma.notebookPage.findUniqueOrThrow({ where: { id } });
+    expect(after.updatedByName).toBe(before.updatedByName);
   });
 });
