@@ -2,6 +2,14 @@
 
 Registro de decisões e entregas do projeto: o que foi pedido, o que foi feito e por quê. Não substitui o `git log` (que tem o detalhe técnico de cada commit) nem o `README.md` (que descreve o sistema como ele é hoje); serve para explicar o raciocínio por trás das mudanças, na ordem em que aconteceram. Entradas mais novas no topo.
 
+## 2026-09-25 (continuação) — Anexos e comentários na criação, reticências e card de progresso
+
+Três pedidos do usuário depois da correção dos diálogos:
+
+- **Reticências**: o valor do `SelectTrigger` era um `display: flex` (para alinhar ícones), e `text-overflow: ellipsis` não funciona em contêiner flex — o texto só era cortado. Nenhum select do sistema usa ícone dentro do item (conferi), então o valor virou `block truncate` em `components/ui/select.tsx`, valendo para todos. Medido no navegador: `text-overflow: ellipsis` no valor do "Responsável".
+- **Anexos e comentários na criação**: para o diálogo de criação ser igual ao de edição *por construção* e não por cópia, extraí as duas seções para `task-extras.tsx` (`AttachmentsSection`, `CommentsSection`, só desenham linhas e avisam cliques) e o diálogo de edição passou a usá-las. Na criação, arquivos (até 3) e comentários ficam em estado local, com "Excluir"/remover, e são enviados logo depois de `createTask` (um comentário digitado e não "enviado" também vale). Se o envio de algum falhar, a tarefa continua criada e aparece um aviso pedindo para abrir a tarefa e tentar de novo. A validação de arquivos foi para `validateUploadFiles` em `lib/uploadLimits.ts`, com teste unitário. Verificado no navegador: tarefa + 1 comentário + 1 anexo gravados pelo fluxo real (dados de teste removidos, inclusive o arquivo em `storage/uploads`).
+- **Card de progresso**: o "Progresso do projeto" do Kanban era uma linha solta; agora é um `Card` com título, percentual grande, barra em largura total (`TaskProgress variant="bar"`) e a legenda "X de Y tarefas concluídas · N em aberto · M canceladas".
+
 ## 2026-09-25 (continuação) — Diálogos de tarefa: de novo diferentes e cortados
 
 O usuário reportou que o diálogo "Nova tarefa" voltou a ser diferente do de edição e que o de edição estava com o conteúdo cortado na horizontal. Medi no Edge antes de mexer (a lição do bug da barra lateral), e eram dois problemas separados:

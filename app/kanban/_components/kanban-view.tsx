@@ -39,6 +39,7 @@ import {
   TASK_STATUS_ORDER,
   type TaskItem,
 } from "@/app/kanban/_components/task-types";
+import { Card, CardContent } from "@/components/ui/card";
 import { TaskProgress } from "@/components/task-progress";
 import { useStatusChangeGuard } from "@/components/use-status-change";
 import { isTaskOpen, summarizeTasks } from "@/lib/taskStatus";
@@ -747,16 +748,28 @@ function KanbanBoard({
             </p>
           ) : null}
           {!isMine && taskSummary.total > 0 ? (
-            <div className="flex items-center gap-3 text-sm text-muted-foreground">
-              <span>Progresso do projeto</span>
-              <TaskProgress done={taskSummary.done} total={taskSummary.total} />
-              <span className="text-xs">
-                {taskSummary.percent}% concluído
-                {taskSummary.canceled
-                  ? ` · ${taskSummary.canceled} cancelada(s)`
-                  : ""}
-              </span>
-            </div>
+            <Card size="sm">
+              <CardContent className="grid min-w-0 gap-2">
+                <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                  <h2 className="text-sm font-medium">Progresso do projeto</h2>
+                  <span className="text-2xl font-semibold tabular-nums">
+                    {taskSummary.percent}%
+                  </span>
+                </div>
+                <TaskProgress
+                  done={taskSummary.done}
+                  total={taskSummary.total}
+                  variant="bar"
+                />
+                <p className="text-xs text-muted-foreground">
+                  {taskSummary.done} de {taskSummary.total} tarefas concluídas
+                  {taskSummary.open ? ` · ${taskSummary.open} em aberto` : ""}
+                  {taskSummary.canceled
+                    ? ` · ${taskSummary.canceled} cancelada(s)`
+                    : ""}
+                </p>
+              </CardContent>
+            </Card>
           ) : null}
           <div className="flex items-stretch gap-3 overflow-x-auto pb-3">
             {taskBoard.map((column) => (

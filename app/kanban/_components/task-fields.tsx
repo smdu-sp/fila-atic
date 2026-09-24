@@ -48,8 +48,8 @@ export type TaskFormFieldsProps = {
   labels: string[];
   onLabelsChange: (value: string[]) => void;
   disabled?: boolean;
-  // Extra content under the description, inside the main column (attachments
-  // and comments, which only make sense once the task already exists).
+  // Extra content under the description, inside the main column
+  // (attachments and comments).
   mainAfter?: ReactNode;
 };
 

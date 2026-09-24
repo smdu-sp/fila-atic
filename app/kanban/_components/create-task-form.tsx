@@ -5,8 +5,13 @@ import { toast } from "sonner";
 import { ProjectPriority, TaskStatus } from "@prisma/client";
 
 import { createTask } from "@/actions/taskActions";
+import { addTaskAttachments, addTaskComment } from "@/actions/taskDetailActions";
 import { NO_ASSIGNEE } from "@/app/kanban/_components/assignee-items";
 import { TaskFormFields } from "@/app/kanban/_components/task-fields";
+import {
+  AttachmentsSection,
+  CommentsSection,
+} from "@/app/kanban/_components/task-extras";
 import { TASK_STATUS_ORDER } from "@/app/kanban/_components/task-types";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
@@ -18,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { MAX_UPLOAD_FILES } from "@/lib/uploadLimits";
 
 type ProjectOption = { id: string; title: string };
 type Assignee = { id: string; name: string };
@@ -59,8 +65,9 @@ const blank = (projectId: string, status?: TaskStatus): FormState => ({
 });
 
 // Same fields, same layout and the same behavior as the dialog opened by
-// clicking an existing task (see TaskDialog): only what does not yet make
-// sense for a task that does not exist (attachments, comments) is left out.
+// clicking an existing task (see TaskDialog). Attachments and comments cannot
+// be saved before the task exists, so they are kept on this screen and sent
+// right after the task is created.
 export function CreateTaskForm({
   projects,
   initialProjectId,
@@ -80,6 +87,9 @@ export function CreateTaskForm({
     blank(initialProjectId ?? "", initialStatus),
   );
   const [titleError, setTitleError] = useState<string | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [comments, setComments] = useState<string[]>([]);
+  const [commentDraft, setCommentDraft] = useState("");
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -114,8 +124,35 @@ export function CreateTaskForm({
         return;
       }
 
-      toast.success("Tarefa criada.");
+      // The comment that is typed but not "sent" yet still counts.
+      const pendingComments = commentDraft.trim()
+        ? [...comments, commentDraft]
+        : comments;
+      const failures: string[] = [];
+
+      for (const message of pendingComments) {
+        const sent = await addTaskComment({ taskId: result.data, message });
+        if (!sent.success) failures.push(sent.error);
+      }
+      if (files.length) {
+        const formData = new FormData();
+        formData.set("taskId", result.data);
+        files.forEach((file) => formData.append("attachments", file));
+        const sent = await addTaskAttachments(formData);
+        if (!sent.success) failures.push(sent.error);
+      }
+
+      if (failures.length) {
+        toast.warning(
+          `Tarefa criada, mas nem tudo foi salvo: ${failures.join("; ")}. Abra a tarefa para tentar de novo.`,
+        );
+      } else {
+        toast.success("Tarefa criada.");
+      }
       setForm(blank(form.projectId, form.status));
+      setFiles([]);
+      setComments([]);
+      setCommentDraft("");
       onCreated?.();
     });
   };
@@ -167,6 +204,51 @@ export function CreateTaskForm({
         onDueDateChange={(value) => set("dueDate", value)}
         labels={form.labels}
         onLabelsChange={(value) => set("labels", value)}
+        mainAfter={
+          <>
+            <AttachmentsSection
+              rows={files.map((file, index) => ({
+                key: String(index),
+                name: file.name,
+                size: file.size,
+                removable: true,
+              }))}
+              disabled={isPending}
+              onPick={(picked) => {
+                if (files.length + picked.length > MAX_UPLOAD_FILES) {
+                  toast.error(
+                    `Envie no máximo ${MAX_UPLOAD_FILES} arquivos por tarefa nova.`,
+                  );
+                  return;
+                }
+                setFiles((prev) => [...prev, ...picked]);
+              }}
+              onRemove={(key) =>
+                setFiles((prev) => prev.filter((_, i) => String(i) !== key))
+              }
+            />
+            <CommentsSection
+              rows={comments.map((message, index) => ({
+                key: String(index),
+                authorName: "Você",
+                when: "será enviado ao criar a tarefa",
+                message,
+                removable: true,
+              }))}
+              disabled={isPending}
+              draft={commentDraft}
+              onDraftChange={setCommentDraft}
+              onSend={() => {
+                if (!commentDraft.trim()) return;
+                setComments((prev) => [...prev, commentDraft]);
+                setCommentDraft("");
+              }}
+              onRemove={(key) =>
+                setComments((prev) => prev.filter((_, i) => String(i) !== key))
+              }
+            />
+          </>
+        }
       />
       {titleError ? (
         <span className="-mt-2 text-xs text-destructive">{titleError}</span>

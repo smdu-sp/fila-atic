@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { ProjectPriority, TaskStatus } from "@prisma/client";
-import { FileText, Paperclip, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { updateTask } from "@/actions/taskActions";
@@ -15,9 +14,12 @@ import {
   type TaskAttachmentItem,
   type TaskComment,
 } from "@/actions/taskDetailActions";
-import { UserAvatar } from "@/app/kanban/_components/board-ui";
 import { NO_ASSIGNEE } from "@/app/kanban/_components/assignee-items";
 import { TaskFormFields } from "@/app/kanban/_components/task-fields";
+import {
+  AttachmentsSection,
+  CommentsSection,
+} from "@/app/kanban/_components/task-extras";
 import type { TaskItem } from "@/app/kanban/_components/task-types";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,14 +30,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
 import { toDateInput } from "@/lib/dueDate";
-import { MAX_COMMENT_LENGTH } from "@/lib/taskFields";
-import {
-  formatFileSize,
-  MAX_UPLOAD_FILES,
-  MAX_UPLOAD_SIZE,
-} from "@/lib/uploadLimits";
 
 type Assignee = { id: string; name: string };
 
@@ -115,8 +110,6 @@ function TaskDialogBody({
   const [detailsError, setDetailsError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [comment, setComment] = useState("");
-  const [fileKey, setFileKey] = useState(0);
-  const fileInput = useRef<HTMLInputElement>(null);
 
   // Managers may always pick (even a currently empty list still offers "Sem
   // responsável"); anyone else only sees who owns the task, read-only.
@@ -211,22 +204,6 @@ function TaskDialogBody({
     });
 
   const upload = (files: File[]) => {
-    // A new key remounts the input, so choosing the same file again works.
-    setFileKey((key) => key + 1);
-    if (!files.length) return;
-
-    if (files.length > MAX_UPLOAD_FILES) {
-      toast.error(`Envie no máximo ${MAX_UPLOAD_FILES} arquivos por vez.`);
-      return;
-    }
-    const tooBig = files.find((file) => file.size > MAX_UPLOAD_SIZE);
-    if (tooBig) {
-      toast.error(
-        `Arquivo acima de ${MAX_UPLOAD_SIZE / 1024 / 1024} MB: ${tooBig.name}`,
-      );
-      return;
-    }
-
     startTransition(async () => {
       const formData = new FormData();
       formData.set("taskId", task.id);
@@ -288,152 +265,36 @@ function TaskDialogBody({
         disabled={!canEdit}
         mainAfter={
           <>
-            <section className="grid gap-2" aria-label="Anexos">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h4 className="text-sm font-medium">
-                  Anexos
-                  {details?.attachments.length
-                    ? ` (${details.attachments.length})`
-                    : ""}
-                </h4>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={isPending}
-                  onClick={() => fileInput.current?.click()}
-                >
-                  <Paperclip />
-                  Anexar arquivo
-                </Button>
-                <input
-                  key={fileKey}
-                  ref={fileInput}
-                  type="file"
-                  multiple
-                  hidden
-                  onChange={(event) =>
-                    upload(Array.from(event.target.files ?? []))
-                  }
-                />
-              </div>
-              {detailsError ? (
-                <p className="text-sm text-destructive" role="alert">
-                  {detailsError}
-                </p>
-              ) : details === null ? (
-                <p className="text-sm text-muted-foreground">Carregando...</p>
-              ) : details.attachments.length ? (
-                <ul className="grid gap-1.5">
-                  {details.attachments.map((attachment) => (
-                    <li
-                      key={attachment.id}
-                      className="flex items-center justify-between gap-2 rounded-lg border border-border/60 px-2.5 py-1.5 text-sm"
-                    >
-                      <a
-                        href={attachment.fileUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex min-w-0 items-center gap-2 hover:text-primary hover:underline"
-                      >
-                        <FileText className="size-4 shrink-0 text-muted-foreground" />
-                        <span className="truncate">{attachment.fileName}</span>
-                        <span className="shrink-0 text-xs text-muted-foreground">
-                          {formatFileSize(attachment.fileSize)}
-                        </span>
-                      </a>
-                      {isManager ||
-                      attachment.uploadedById === currentUserId ? (
-                        <Button
-                          type="button"
-                          size="icon-xs"
-                          variant="ghost"
-                          disabled={isPending}
-                          aria-label={`Remover anexo ${attachment.fileName}`}
-                          onClick={() => removeAttachment(attachment.id)}
-                        >
-                          <Trash2 />
-                        </Button>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-sm text-muted-foreground">Nenhum anexo.</p>
-              )}
-            </section>
-
-            <section className="grid gap-3" aria-label="Comentários">
-              <h4 className="text-sm font-medium">
-                Comentários
-                {details?.comments.length
-                  ? ` (${details.comments.length})`
-                  : ""}
-              </h4>
-              {details?.comments.length ? (
-                <ul className="grid gap-3">
-                  {details.comments.map((item) => (
-                    <li key={item.id} className="flex gap-2.5">
-                      <UserAvatar name={item.authorName} />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-baseline gap-x-2 text-xs text-muted-foreground">
-                          <span className="text-sm font-medium text-foreground">
-                            {item.authorName}
-                          </span>
-                          {formatDateTime(item.createdAt)}
-                          {isManager || item.authorId === currentUserId ? (
-                            <button
-                              type="button"
-                              disabled={isPending}
-                              onClick={() => removeComment(item.id)}
-                              className="hover:text-destructive hover:underline"
-                            >
-                              Excluir
-                            </button>
-                          ) : null}
-                        </div>
-                        <p className="whitespace-pre-wrap break-words text-sm">
-                          {item.message}
-                        </p>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              ) : details ? (
-                <p className="text-sm text-muted-foreground">
-                  Nenhum comentário ainda.
-                </p>
-              ) : null}
-              <div className="grid gap-2">
-                <Textarea
-                  aria-label="Novo comentário"
-                  value={comment}
-                  rows={2}
-                  maxLength={MAX_COMMENT_LENGTH}
-                  placeholder="Escreva um comentário (Ctrl+Enter envia)"
-                  onChange={(event) => setComment(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (
-                      event.key === "Enter" &&
-                      (event.ctrlKey || event.metaKey)
-                    ) {
-                      event.preventDefault();
-                      sendComment();
-                    }
-                  }}
-                />
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  className="justify-self-end"
-                  disabled={isPending || !comment.trim()}
-                  onClick={sendComment}
-                >
-                  Comentar
-                </Button>
-              </div>
-            </section>
+            <AttachmentsSection
+              rows={(details?.attachments ?? []).map((attachment) => ({
+                key: attachment.id,
+                name: attachment.fileName,
+                size: attachment.fileSize,
+                href: attachment.fileUrl,
+                removable:
+                  isManager || attachment.uploadedById === currentUserId,
+              }))}
+              loading={details === null}
+              error={detailsError}
+              disabled={isPending}
+              onPick={upload}
+              onRemove={removeAttachment}
+            />
+            <CommentsSection
+              rows={(details?.comments ?? []).map((item) => ({
+                key: item.id,
+                authorName: item.authorName,
+                when: formatDateTime(item.createdAt),
+                message: item.message,
+                removable: isManager || item.authorId === currentUserId,
+              }))}
+              loaded={details !== null}
+              disabled={isPending}
+              draft={comment}
+              onDraftChange={setComment}
+              onSend={sendComment}
+              onRemove={removeComment}
+            />
           </>
         }
       />

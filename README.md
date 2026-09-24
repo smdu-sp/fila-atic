@@ -97,7 +97,7 @@ Rodar mais de uma vez no dia é seguro: cada aviso é entregue uma única vez. A
 
 ## Tarefas e Kanban
 
-Clicar em uma tarefa abre o diálogo completo: título, descrição, status, prioridade, responsável, prazo, etiquetas coloridas (até 8, da paleta cadastrada pela coordenação), anexos e comentários. Só o responsável e a coordenação/DEV II alteram os dados; qualquer pessoa da equipe com acesso ao projeto comenta e anexa. Solicitantes nunca veem tarefas, comentários ou anexos de tarefa.
+Clicar em uma tarefa abre o diálogo completo: título, descrição, status, prioridade, responsável, prazo, etiquetas coloridas (até 8, da paleta cadastrada pela coordenação), anexos e comentários. Só o responsável e a coordenação/DEV II alteram os dados; qualquer pessoa da equipe com acesso ao projeto comenta e anexa. Solicitantes nunca veem tarefas, comentários ou anexos de tarefa. O diálogo de "Nova tarefa" é idêntico ao de edição, inclusive anexos (até 3) e comentários: como a tarefa ainda não existe, eles ficam na tela e são enviados logo depois da criação. No topo do quadro de tarefas, um card mostra o progresso do projeto (percentual, barra e contagem de concluídas/em aberto/canceladas).
 
 Os cartões podem ser arrastados entre colunas e reordenados dentro delas (a posição é gravada; tarefas novas entram no topo). Na visão "Minhas tarefas" só a troca de coluna é possível. O quadro filtra por texto, responsável, prioridade e etiqueta.
 

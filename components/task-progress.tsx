@@ -4,10 +4,14 @@ import { cn } from "@/lib/utils";
 export function TaskProgress({
   done,
   total,
+  variant = "inline",
   className,
 }: {
   done: number;
   total: number;
+  // "inline": short bar with the count beside it (lists and cards).
+  // "bar": full-width, thicker bar on its own (the Kanban progress card).
+  variant?: "inline" | "bar";
   className?: string;
 }) {
   if (total === 0) {
@@ -19,6 +23,28 @@ export function TaskProgress({
   }
 
   const percent = Math.round((done / total) * 100);
+
+  if (variant === "bar") {
+    return (
+      <div
+        role="progressbar"
+        aria-valuenow={percent}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label="Progresso das tarefas"
+        title={`${done} de ${total} tarefas concluídas (${percent}%)`}
+        className={cn("h-2.5 w-full overflow-hidden rounded-full bg-muted", className)}
+      >
+        <div
+          className={cn(
+            "h-full rounded-full transition-[width]",
+            percent === 100 ? "bg-emerald-500" : "bg-primary",
+          )}
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div
