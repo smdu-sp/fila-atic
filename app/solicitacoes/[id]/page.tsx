@@ -136,7 +136,7 @@ export default async function SolicitacaoDetalhePage({
               />
             ) : null}
 
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_18rem]">
               {/* Main column: what the request is, its tasks, the chat. */}
               <div className="grid min-w-0 content-start gap-4">
                 <Card>
@@ -362,9 +362,15 @@ export default async function SolicitacaoDetalhePage({
               </div>
 
               {/* Right sidebar: status/priority controls, team, reporter, dates. */}
-              <aside className="grid min-w-0 content-start gap-4 lg:sticky lg:top-4">
+              <aside className="grid min-w-0 content-start gap-4 xl:sticky xl:top-4">
                 {!isRequester ? (
-                  <div className="min-w-0 rounded-xl bg-sky-50 p-4 ring-1 ring-sky-200/70 dark:bg-sky-950/20 dark:ring-sky-900/40">
+                  // overflow-x-auto here is a backstop: if this narrow column
+                  // ever gets something wider than it (a form field, a long
+                  // name) despite min-w-0, it scrolls inside this box instead
+                  // of breaking the rest of the page. Check this is still
+                  // present before assuming a future overflow report is
+                  // something new.
+                  <div className="min-w-0 overflow-x-auto rounded-xl bg-sky-50 p-4 ring-1 ring-sky-200/70 dark:bg-sky-950/20 dark:ring-sky-900/40">
                     <ProjectControls
                       projectId={details.id}
                       role={session?.user?.role ?? Role.REQUESTER}

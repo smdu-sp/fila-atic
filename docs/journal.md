@@ -2,6 +2,18 @@
 
 Registro de decisões e entregas do projeto: o que foi pedido, o que foi feito e por quê. Não substitui o `git log` (que tem o detalhe técnico de cada commit) nem o `README.md` (que descreve o sistema como ele é hoje); serve para explicar o raciocínio por trás das mudanças, na ordem em que aconteceram. Entradas mais novas no topo.
 
+## 2026-09-25 (continuação) — Terceira tentativa no corte da barra lateral: parei de adivinhar
+
+Segundo print do usuário, mesmo problema (nome de desenvolvedor cortado sem reticências, campos encostando na borda), mesmo depois da correção anterior. Sem um navegador de verdade para inspecionar, cheguei ao limite de deduzir a causa só lendo código e reagindo a prints — cada rodada corrigia uma hipótese plausível (e provavelmente real) sem garantia de ser a única.
+
+Em vez de arriscar uma quarta hipótese, troquei de estratégia por duas frentes que não dependem de eu acertar a causa exata:
+
+- **A coluna lateral fixa (antes 20rem) só existe a partir da tela `xl` (1280px) agora, não mais `lg` (1024px)**; abaixo disso, a barra lateral empilha embaixo do conteúdo principal, em largura total — nesse caso não existe "coluna estreita demais" para nada vazar.
+- **`overflow-x-auto` no bloco de controles** (o que aparece nos prints): se sobrar alguma largura que os ajustes de `min-w-0` não peguem, agora ela vira uma barra de rolagem contida dentro do próprio bloco azul, em vez de vazar para a página inteira. Não é elegante, mas é a garantia de que, seja qual for a causa raiz, o resto da página para de quebrar por causa dela.
+
+Registrando para não repetir o padrão: comentei no código do bloco de controles, com um exemplo de commit, para o próximo ajuste nessa área conferir o `overflow-x-auto` antes de assumir que sumiu.
+
+
 ## 2026-09-25 — Correção de verdade do corte na barra lateral do detalhe
 
 O usuário mandou um print: a barra lateral do detalhe do projeto continuava cortada na borda direita da tela mesmo depois da correção anterior. Dessa vez consegui ver o problema de verdade (nome de desenvolvedor longo, "Thamyris Aparecida Souza Bareicha de Ab" cortado sem reticências) em vez de só suspeitar.
