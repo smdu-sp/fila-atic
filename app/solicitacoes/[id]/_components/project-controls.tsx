@@ -19,6 +19,7 @@ import { useStatusChangeGuard } from "@/components/use-status-change";
 import type { OpenTask } from "@/lib/projectStatus";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -44,7 +45,10 @@ type ProjectControlsProps = {
   defaultCategory?: ProjectCategory | null;
   assignedDevelopers: DeveloperOption[];
   assignableDevelopers: DeveloperOption[];
-  variant?: "card" | "inline";
+  // card/inline: the old layouts (inline is the one actually in use).
+  // sidebar: labelled fields stacked in a column, for the Jira-like detail
+  // page's right-hand panel.
+  variant?: "card" | "inline" | "sidebar";
 };
 
 export function ProjectControls({
@@ -99,7 +103,11 @@ export function ProjectControls({
 
   const handleRemove = (userId: string, unassignTasks = false) => {
     startTransition(async () => {
-      const result = await removeDeveloper({ projectId, userId, unassignTasks });
+      const result = await removeDeveloper({
+        projectId,
+        userId,
+        unassignTasks,
+      });
       if (!result.success) {
         if (result.openTasks?.length) {
           const name =
@@ -121,6 +129,139 @@ export function ProjectControls({
     return null;
   }
 
+  if (variant === "sidebar") {
+    return (
+      <>
+        <div className="grid gap-4">
+          {role === Role.DEV_RESTRICTED ? (
+            <div className="grid gap-1.5">
+              <Label htmlFor="project-status-sidebar">Status</Label>
+              <Select
+                value={statusValue}
+                onValueChange={(value) => {
+                  const nextStatus = value as ProjectStatus;
+                  const previous = statusValue;
+                  setStatusValue(nextStatus);
+                  startTransition(async () => {
+                    const applied = await guard.request(nextStatus, (options) =>
+                      updateProjectStatusRestricted(
+                        projectId,
+                        nextStatus,
+                        options,
+                      ),
+                    );
+                    if (!applied) setStatusValue(previous);
+                  });
+                }}
+              >
+                <SelectTrigger id="project-status-sidebar" className="w-full">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.values(ProjectStatus).map((status) => (
+                    <SelectItem key={status} value={status}>
+                      {getStatusLabel(status)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
+            <ProjectUpdateForm
+              projectId={projectId}
+              defaultStatus={defaultStatus}
+              defaultPriority={defaultPriority}
+              showDueDate
+              defaultDueDate={defaultDueDate}
+              showCategory
+              defaultCategory={defaultCategory}
+              layout="stack"
+            />
+          )}
+
+          {canManageAll ? (
+            <div className="grid gap-1.5 border-t border-border/60 pt-4">
+              <Label>Equipe</Label>
+              {assignedDevelopers.length ? (
+                <div className="flex flex-wrap gap-2">
+                  {assignedDevelopers.map((dev) => (
+                    <Badge key={dev.id} variant="outline" className="gap-2">
+                      {dev.name}
+                      <button
+                        type="button"
+                        className="text-xs text-muted-foreground hover:text-foreground"
+                        onClick={() => handleRemove(dev.id)}
+                        disabled={isPending}
+                      >
+                        Remover
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Ninguém atribuído ainda.
+                </p>
+              )}
+              <div className="flex items-center gap-2">
+                <Select value={selectedDev} onValueChange={setSelectedDev}>
+                  <SelectTrigger className="w-full" size="sm">
+                    <SelectValue placeholder="Atribuir desenvolvedor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableDevelopers.map((dev) => (
+                      <SelectItem key={dev.id} value={dev.id}>
+                        {dev.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  size="xs"
+                  onClick={handleAssign}
+                  disabled={!selectedDev}
+                >
+                  Atribuir
+                </Button>
+              </div>
+            </div>
+          ) : assignedDevelopers.length ? (
+            <div className="grid gap-1.5 border-t border-border/60 pt-4">
+              <Label>Equipe</Label>
+              <div className="flex flex-wrap gap-2">
+                {assignedDevelopers.map((dev) => (
+                  <Badge key={dev.id} variant="outline">
+                    {dev.name}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+        {guard.dialog}
+        <OpenTasksDialog
+          open={removal !== null}
+          title={`Remover ${removal?.name ?? ""} do projeto?`}
+          description={
+            removal?.openTasks.length === 1
+              ? "Há 1 tarefa em aberto com essa pessoa. Ao remover, ela fica sem responsável."
+              : `Há ${removal?.openTasks.length ?? 0} tarefas em aberto com essa pessoa. Ao remover, elas ficam sem responsável.`
+          }
+          openTasks={removal?.openTasks ?? []}
+          actions={[
+            {
+              label: "Remover e liberar tarefas",
+              variant: "destructive",
+              onClick: () => removal && handleRemove(removal.userId, true),
+            },
+          ]}
+          busy={isPending}
+          onClose={() => setRemoval(null)}
+        />
+      </>
+    );
+  }
+
   const isInline = variant === "inline";
   const updateFormId = `project-update-${projectId}`;
   const containerClassName = isInline
@@ -129,112 +270,97 @@ export function ProjectControls({
 
   return (
     <>
-    <div className={containerClassName}>
-      {!isInline ? (
-        <div className="grid gap-1">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">
-            Gestao do projeto
-          </p>
-        </div>
-      ) : null}
+      <div className={containerClassName}>
+        {!isInline ? (
+          <div className="grid gap-1">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+              Gestao do projeto
+            </p>
+          </div>
+        ) : null}
 
-      {role === Role.DEV_RESTRICTED ? (
-        <div className="flex flex-nowrap items-center gap-2 overflow-x-auto whitespace-nowrap">
-          <Select
-            value={statusValue}
-            onValueChange={(value) => {
-              const nextStatus = value as ProjectStatus;
-              const previous = statusValue;
-              setStatusValue(nextStatus);
-              startTransition(async () => {
-                const applied = await guard.request(nextStatus, (options) =>
-                  updateProjectStatusRestricted(projectId, nextStatus, options),
-                );
-                // refused, or waiting for the person to decide in the dialog
-                if (!applied) setStatusValue(previous);
-              });
-            }}
-          >
-            <SelectTrigger className="w-[140px]" size="sm">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.values(ProjectStatus).map((status) => (
-                <SelectItem key={status} value={status}>
-                  {getStatusLabel(status)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      ) : null}
-
-      {!canManageAll ? (
-        role !== Role.DEV_RESTRICTED ? (
-          <ProjectUpdateForm
-            projectId={projectId}
-            defaultStatus={defaultStatus}
-            defaultPriority={defaultPriority}
-            compact
-            layout={isInline ? "inline" : "grid"}
-            formId={isInline ? updateFormId : undefined}
-          />
-        ) : null
-      ) : null}
-
-      {canManageAll ? (
-        isInline ? (
+        {role === Role.DEV_RESTRICTED ? (
           <div className="flex flex-nowrap items-center gap-2 overflow-x-auto whitespace-nowrap">
+            <Select
+              value={statusValue}
+              onValueChange={(value) => {
+                const nextStatus = value as ProjectStatus;
+                const previous = statusValue;
+                setStatusValue(nextStatus);
+                startTransition(async () => {
+                  const applied = await guard.request(nextStatus, (options) =>
+                    updateProjectStatusRestricted(
+                      projectId,
+                      nextStatus,
+                      options,
+                    ),
+                  );
+                  // refused, or waiting for the person to decide in the dialog
+                  if (!applied) setStatusValue(previous);
+                });
+              }}
+            >
+              <SelectTrigger className="w-[140px]" size="sm">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.values(ProjectStatus).map((status) => (
+                  <SelectItem key={status} value={status}>
+                    {getStatusLabel(status)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
+
+        {!canManageAll ? (
+          role !== Role.DEV_RESTRICTED ? (
             <ProjectUpdateForm
               projectId={projectId}
               defaultStatus={defaultStatus}
               defaultPriority={defaultPriority}
               compact
-              layout="inline"
-              formId={updateFormId}
-              showSubmit={false}
-              showDueDate
-              defaultDueDate={defaultDueDate}
-              showCategory
-              defaultCategory={defaultCategory}
+              layout={isInline ? "inline" : "grid"}
+              formId={isInline ? updateFormId : undefined}
             />
-            <Select value={selectedDev} onValueChange={setSelectedDev}>
-              <SelectTrigger className="w-[180px]" size="sm">
-                <SelectValue placeholder="Atribuir desenvolvedor" />
-              </SelectTrigger>
-              <SelectContent>
-                {availableDevelopers.map((dev) => (
-                  <SelectItem key={dev.id} value={dev.id}>
-                    {dev.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button size="xs" onClick={handleAssign} disabled={!selectedDev}>
-              Atribuir
-            </Button>
-            <Button size="xs" type="submit" form={updateFormId}>
-              Salvar
-            </Button>
-            {assignedDevelopers.length
-              ? assignedDevelopers.map((dev) => (
-                  <Badge key={dev.id} variant="outline" className="gap-2">
-                    {dev.name}
-                    <button
-                      type="button"
-                      className="text-xs text-muted-foreground hover:text-foreground"
-                      onClick={() => handleRemove(dev.id)}
-                      disabled={isPending}
-                    >
-                      Remover
-                    </button>
-                  </Badge>
-                ))
-              : null}
-          </div>
-        ) : (
-          <div className="grid gap-3">
-            <div className="flex flex-wrap items-center gap-2">
+          ) : null
+        ) : null}
+
+        {canManageAll ? (
+          isInline ? (
+            <div className="flex flex-nowrap items-center gap-2 overflow-x-auto whitespace-nowrap">
+              <ProjectUpdateForm
+                projectId={projectId}
+                defaultStatus={defaultStatus}
+                defaultPriority={defaultPriority}
+                compact
+                layout="inline"
+                formId={updateFormId}
+                showSubmit={false}
+                showDueDate
+                defaultDueDate={defaultDueDate}
+                showCategory
+                defaultCategory={defaultCategory}
+              />
+              <Select value={selectedDev} onValueChange={setSelectedDev}>
+                <SelectTrigger className="w-[180px]" size="sm">
+                  <SelectValue placeholder="Atribuir desenvolvedor" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableDevelopers.map((dev) => (
+                    <SelectItem key={dev.id} value={dev.id}>
+                      {dev.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button size="xs" onClick={handleAssign} disabled={!selectedDev}>
+                Atribuir
+              </Button>
+              <Button size="xs" type="submit" form={updateFormId}>
+                Salvar
+              </Button>
               {assignedDevelopers.length
                 ? assignedDevelopers.map((dev) => (
                     <Badge key={dev.id} variant="outline" className="gap-2">
@@ -251,47 +377,70 @@ export function ProjectControls({
                   ))
                 : null}
             </div>
-            <div className="flex items-center gap-2">
-              <Select value={selectedDev} onValueChange={setSelectedDev}>
-                <SelectTrigger className="w-full min-w-[200px]" size="sm">
-                  <SelectValue placeholder="Atribuir desenvolvedor" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableDevelopers.map((dev) => (
-                    <SelectItem key={dev.id} value={dev.id}>
-                      {dev.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button size="xs" onClick={handleAssign} disabled={!selectedDev}>
-                Atribuir
-              </Button>
+          ) : (
+            <div className="grid gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                {assignedDevelopers.length
+                  ? assignedDevelopers.map((dev) => (
+                      <Badge key={dev.id} variant="outline" className="gap-2">
+                        {dev.name}
+                        <button
+                          type="button"
+                          className="text-xs text-muted-foreground hover:text-foreground"
+                          onClick={() => handleRemove(dev.id)}
+                          disabled={isPending}
+                        >
+                          Remover
+                        </button>
+                      </Badge>
+                    ))
+                  : null}
+              </div>
+              <div className="flex items-center gap-2">
+                <Select value={selectedDev} onValueChange={setSelectedDev}>
+                  <SelectTrigger className="w-full min-w-[200px]" size="sm">
+                    <SelectValue placeholder="Atribuir desenvolvedor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableDevelopers.map((dev) => (
+                      <SelectItem key={dev.id} value={dev.id}>
+                        {dev.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  size="xs"
+                  onClick={handleAssign}
+                  disabled={!selectedDev}
+                >
+                  Atribuir
+                </Button>
+              </div>
             </div>
-          </div>
-        )
-      ) : null}
-    </div>
-    {guard.dialog}
-    <OpenTasksDialog
-      open={removal !== null}
-      title={`Remover ${removal?.name ?? ""} do projeto?`}
-      description={
-        removal?.openTasks.length === 1
-          ? "Há 1 tarefa em aberto com essa pessoa. Ao remover, ela fica sem responsável."
-          : `Há ${removal?.openTasks.length ?? 0} tarefas em aberto com essa pessoa. Ao remover, elas ficam sem responsável.`
-      }
-      openTasks={removal?.openTasks ?? []}
-      actions={[
-        {
-          label: "Remover e liberar tarefas",
-          variant: "destructive",
-          onClick: () => removal && handleRemove(removal.userId, true),
-        },
-      ]}
-      busy={isPending}
-      onClose={() => setRemoval(null)}
-    />
+          )
+        ) : null}
+      </div>
+      {guard.dialog}
+      <OpenTasksDialog
+        open={removal !== null}
+        title={`Remover ${removal?.name ?? ""} do projeto?`}
+        description={
+          removal?.openTasks.length === 1
+            ? "Há 1 tarefa em aberto com essa pessoa. Ao remover, ela fica sem responsável."
+            : `Há ${removal?.openTasks.length ?? 0} tarefas em aberto com essa pessoa. Ao remover, elas ficam sem responsável.`
+        }
+        openTasks={removal?.openTasks ?? []}
+        actions={[
+          {
+            label: "Remover e liberar tarefas",
+            variant: "destructive",
+            onClick: () => removal && handleRemove(removal.userId, true),
+          },
+        ]}
+        busy={isPending}
+        onClose={() => setRemoval(null)}
+      />
     </>
   );
 }

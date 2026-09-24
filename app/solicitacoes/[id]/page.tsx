@@ -13,13 +13,6 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { DueBadge } from "@/components/due-badge";
 import { RequesterActions } from "@/components/requester-actions";
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { listTasksByProject } from "@/actions/taskActions";
 import { listTaskStatusLabels } from "@/actions/taskStatusActions";
@@ -36,6 +29,9 @@ import {
 import { MessageForm } from "@/app/solicitacoes/[id]/_components/message-form";
 import { ProjectControls } from "@/app/solicitacoes/[id]/_components/project-controls";
 import { ProjectTasksPanel } from "@/app/solicitacoes/[id]/_components/project-tasks-panel";
+
+const sectionLabelClassName =
+  "text-xs font-semibold uppercase tracking-wide text-muted-foreground";
 
 export default async function SolicitacaoDetalhePage({
   params,
@@ -69,6 +65,8 @@ export default async function SolicitacaoDetalhePage({
   const details = detailsResult.data;
   const messages = messagesResult.success ? messagesResult.data : [];
   const isRequester = session?.user?.role === Role.REQUESTER;
+  const isClosed =
+    details.status === "FINISHED" || details.status === "CANCELED";
   // Tasks are internal work: requesters only see the project status.
   const [tasksResult, labelsResult] = isRequester
     ? [null, null]
@@ -103,77 +101,41 @@ export default async function SolicitacaoDetalhePage({
             title="Detalhes"
             subtitle={`${formatProjectCode(details.code)} · ${details.title}`}
           />
-          <div className="w-full min-w-0 p-4 pt-6 sm:gap-4 sm:p-6 sm:pt-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="space-y-1">
-                <h1 className="text-2xl font-semibold">Detalhes do projeto</h1>
-                <p className="text-sm text-muted-foreground">
-                  Acompanhe as informacoes e mensagens do projeto.
-                </p>
-              </div>
-              <Link
-                href="/"
-                className="text-sm text-primary underline-offset-4 hover:underline"
-              >
-                Voltar
-              </Link>
-            </div>
+          <div className="grid w-full min-w-0 gap-4 p-4 pt-6 sm:p-6 sm:pt-4">
+            <Link
+              href="/"
+              className="justify-self-end text-sm text-primary underline-offset-4 hover:underline"
+            >
+              Voltar
+            </Link>
 
-            {!isRequester ? (
-              <div className="mt-3">
-                <ProjectControls
-                  projectId={details.id}
-                  role={session?.user?.role ?? Role.REQUESTER}
-                  defaultStatus={details.status}
-                  defaultPriority={details.priority}
-                  defaultDueDate={toDateInput(details.dueDate)}
-                  defaultCategory={details.category}
-                  assignedDevelopers={details.developers.map((dev) => ({
-                    id: dev.id,
-                    name: dev.name,
-                    role: dev.role as Role,
-                  }))}
-                  assignableDevelopers={assignableDevelopers}
-                  variant="inline"
-                />
+            {details.closeReason ? (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-100">
+                <p className="text-xs font-semibold uppercase tracking-wide">
+                  Motivo do cancelamento
+                </p>
+                <p className="mt-1 whitespace-pre-wrap">
+                  {details.closeReason}
+                </p>
               </div>
             ) : null}
 
             {isRequester ? (
-              <div className="mt-3">
-                <RequesterActions
-                  projectId={details.id}
-                  status={details.status}
-                  reopenUntil={details.reopenUntil}
-                />
-              </div>
+              <RequesterActions
+                projectId={details.id}
+                status={details.status}
+                reopenUntil={details.reopenUntil}
+              />
             ) : null}
 
-            <div className="mt-6 grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-              <Card>
-                <CardHeader>
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+              {/* Main column: what the request is, its tasks, the chat. */}
+              <div className="grid min-w-0 content-start gap-6">
+                <div className="grid gap-2">
                   <p className="font-mono text-xs text-muted-foreground">
                     {formatProjectCode(details.code)}
                   </p>
-                  <CardTitle>{details.title}</CardTitle>
-                  <CardDescription>
-                    Criado em {details.createdAt.toLocaleDateString("pt-BR")}
-                    {details.dueDate
-                      ? ` · Previsão de entrega ${formatDueDate(details.dueDate)}`
-                      : ""}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4 text-sm">
-                  {details.closeReason ? (
-                    <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-100">
-                      <p className="text-xs font-semibold uppercase tracking-wide">
-                        Motivo do cancelamento
-                      </p>
-                      <p className="mt-1 whitespace-pre-wrap">
-                        {details.closeReason}
-                      </p>
-                    </div>
-                  ) : null}
+                  <h1 className="text-2xl font-semibold">{details.title}</h1>
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge
                       variant="outline"
@@ -191,100 +153,74 @@ export default async function SolicitacaoDetalhePage({
                         {getCategoryLabel(details.category)}
                       </Badge>
                     ) : null}
-                    <DueBadge
-                      dueDate={details.dueDate}
-                      closed={
-                        details.status === "FINISHED" ||
-                        details.status === "CANCELED"
-                      }
-                    />
+                    <DueBadge dueDate={details.dueDate} closed={isClosed} />
                   </div>
+                </div>
 
-                  <div className="grid gap-2">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                      Solicitante
-                    </p>
-                    <div className="grid gap-1">
-                      <span className="font-medium">
-                        {details.requester.name}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {details.requester.department}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {details.requester.email}
-                      </span>
+                <div className="grid gap-2">
+                  <p className={sectionLabelClassName}>Descrição</p>
+                  <p className="text-sm whitespace-pre-wrap text-foreground">
+                    {details.description}
+                  </p>
+                </div>
+
+                <div className="grid gap-2">
+                  <p className={sectionLabelClassName}>Justificativa</p>
+                  <p className="text-sm whitespace-pre-wrap text-foreground">
+                    {details.justification}
+                  </p>
+                </div>
+
+                {details.customFields.length ? (
+                  <div className="grid gap-3">
+                    <p className={sectionLabelClassName}>Campos adicionais</p>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {details.customFields.map((field) => (
+                        <div key={field.label}>
+                          <p className="text-xs text-muted-foreground">
+                            {field.label}
+                          </p>
+                          <p className="text-sm font-medium">{field.value}</p>
+                        </div>
+                      ))}
                     </div>
                   </div>
+                ) : null}
 
-                  <div className="grid gap-2">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                      Descricao
-                    </p>
-                    <p className="text-sm text-foreground">
-                      {details.description}
+                {!isRequester ? (
+                  <ProjectTasksPanel
+                    projectId={details.id}
+                    projectStatus={details.status}
+                    role={session?.user?.role ?? Role.REQUESTER}
+                    tasks={projectTasks}
+                    taskLabels={taskLabels}
+                    team={details.developers.map((dev) => ({
+                      id: dev.id,
+                      name: dev.name,
+                    }))}
+                    assignableDevelopers={assignableDevelopers.map((dev) => ({
+                      id: dev.id,
+                      name: dev.name,
+                    }))}
+                  />
+                ) : null}
+
+                <div className="grid gap-4 rounded-xl border border-border/60 p-4 sm:p-6">
+                  <div>
+                    <h2 className="text-base font-semibold">
+                      Histórico de mensagens
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      Comunicações entre solicitante e equipe.
                     </p>
                   </div>
-
-                  <div className="grid gap-2">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                      Justificativa
-                    </p>
-                    <p className="text-sm text-foreground">
-                      {details.justification}
-                    </p>
-                  </div>
-
-                  {details.customFields.length ? (
-                    <div className="grid gap-3">
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                        Campos adicionais
-                      </p>
-                      <div className="grid gap-2">
-                        {details.customFields.map((field) => (
-                          <div key={field.label}>
-                            <p className="text-xs text-muted-foreground">
-                              {field.label}
-                            </p>
-                            <p className="text-sm font-medium">{field.value}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {details.developers.length ? (
-                    <div className="grid gap-2">
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                        Desenvolvedores
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {details.developers.map((dev) => (
-                          <Badge key={dev.id} variant="outline">
-                            {dev.name}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-                </CardContent>
-              </Card>
-
-              <Card className="flex flex-col">
-                <CardHeader>
-                  <CardTitle>Historico de mensagens</CardTitle>
-                  <CardDescription>
-                    Comunicacoes entre solicitante e equipe.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="flex flex-1 flex-col gap-4">
                   {!messagesResult.success ? (
                     <div className="text-sm text-destructive">
                       {messagesResult.error}
                     </div>
                   ) : null}
                   {messages.length ? (
-                    <div className="flex flex-1 flex-col gap-3">
+                    <div className="grid gap-3">
                       {messages.map((item) => {
                         const isOwn = item.authorName === currentUserName;
                         const attachmentClasses = isOwn
@@ -338,6 +274,7 @@ export default async function SolicitacaoDetalhePage({
                                         className={`block overflow-hidden rounded-lg border ${attachmentClasses}`}
                                         download={file.fileName}
                                       >
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
                                         <img
                                           src={file.fileUrl}
                                           alt={file.fileName}
@@ -399,29 +336,74 @@ export default async function SolicitacaoDetalhePage({
                       successMessage="Resposta enviada."
                     />
                   ) : null}
-                </CardContent>
-              </Card>
-            </div>
-
-            {!isRequester ? (
-              <div className="mt-4">
-                <ProjectTasksPanel
-                  projectId={details.id}
-                  projectStatus={details.status}
-                  role={session?.user?.role ?? Role.REQUESTER}
-                  tasks={projectTasks}
-                  taskLabels={taskLabels}
-                  team={details.developers.map((dev) => ({
-                    id: dev.id,
-                    name: dev.name,
-                  }))}
-                  assignableDevelopers={assignableDevelopers.map((dev) => ({
-                    id: dev.id,
-                    name: dev.name,
-                  }))}
-                />
+                </div>
               </div>
-            ) : null}
+
+              {/* Right sidebar: status/priority controls, team, reporter, dates. */}
+              <aside className="grid min-w-0 content-start gap-4 lg:sticky lg:top-4">
+                {!isRequester ? (
+                  <div className="rounded-xl border border-border/60 p-4">
+                    <ProjectControls
+                      projectId={details.id}
+                      role={session?.user?.role ?? Role.REQUESTER}
+                      defaultStatus={details.status}
+                      defaultPriority={details.priority}
+                      defaultDueDate={toDateInput(details.dueDate)}
+                      defaultCategory={details.category}
+                      assignedDevelopers={details.developers.map((dev) => ({
+                        id: dev.id,
+                        name: dev.name,
+                        role: dev.role as Role,
+                      }))}
+                      assignableDevelopers={assignableDevelopers}
+                      variant="sidebar"
+                    />
+                  </div>
+                ) : details.developers.length ? (
+                  <div className="grid gap-1.5 rounded-xl border border-border/60 p-4">
+                    <p className={sectionLabelClassName}>Equipe</p>
+                    <div className="flex flex-wrap gap-2">
+                      {details.developers.map((dev) => (
+                        <Badge key={dev.id} variant="outline">
+                          {dev.name}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="grid gap-3 rounded-xl border border-border/60 p-4">
+                  <div className="grid gap-1">
+                    <p className={sectionLabelClassName}>Solicitante</p>
+                    <span className="text-sm font-medium">
+                      {details.requester.name}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {details.requester.department}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {details.requester.email}
+                    </span>
+                  </div>
+                  <div className="grid gap-1 border-t border-border/60 pt-3">
+                    <p className={sectionLabelClassName}>Criado em</p>
+                    <span className="text-sm">
+                      {details.createdAt.toLocaleDateString("pt-BR")}
+                    </span>
+                  </div>
+                  {details.dueDate ? (
+                    <div className="grid gap-1 border-t border-border/60 pt-3">
+                      <p className={sectionLabelClassName}>
+                        Previsão de entrega
+                      </p>
+                      <span className="text-sm">
+                        {formatDueDate(details.dueDate)}
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
+              </aside>
+            </div>
           </div>
         </SidebarInset>
       </SidebarProvider>

@@ -2,6 +2,13 @@
 
 Registro de decisões e entregas do projeto: o que foi pedido, o que foi feito e por quê. Não substitui o `git log` (que tem o detalhe técnico de cada commit) nem o `README.md` (que descreve o sistema como ele é hoje); serve para explicar o raciocínio por trás das mudanças, na ordem em que aconteceram. Entradas mais novas no topo.
 
+## 2026-09-24 (continuação) — Fase 9: detalhe do projeto em estilo Jira
+
+Escopo combinado antes de começar: reorganização visual reaproveitando o que já existe, sem recurso novo, mantendo o chat. Virou um layout de duas colunas — título, descrição, justificativa, campos adicionais, tarefas e o chat na coluna principal; status, prioridade, categoria, equipe, solicitante e datas numa barra lateral estreita e fixa (`sticky`), do mesmo jeito que o diálogo de tarefa (`TaskFormFields`) já fazia — mesma linguagem visual nos dois lugares agora. Nenhum dado novo, nenhuma ação nova: só reposicionamento.
+
+No caminho, achei dois pontos mortos em `ProjectControls` que valem registrar (não mexi neles, só evitei repeti-los na variante nova): a variante `"card"` nunca era usada em lugar nenhum do sistema, e o ramo dela para quem gerencia projetos não desenhava o formulário de status/prioridade — ficaria faltando se algum dia alguém tentasse usar essa variante. A variante nova (`"sidebar"`) foi escrita do zero para não herdar esse buraco.
+
+
 ## 2026-09-24 — "Caderno" virou "Wiki"; reorganização por arrastar
 
 Duas coisas pedidas juntas antes da fase 9:
