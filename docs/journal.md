@@ -2,6 +2,14 @@
 
 Registro de decisões e entregas do projeto: o que foi pedido, o que foi feito e por quê. Não substitui o `git log` (que tem o detalhe técnico de cada commit) nem o `README.md` (que descreve o sistema como ele é hoje); serve para explicar o raciocínio por trás das mudanças, na ordem em que aconteceram. Entradas mais novas no topo.
 
+## 2026-09-24 (continuação) — Correção: detalhe do projeto não cabia e estava tudo cinza
+
+Dois problemas relatados depois da fase 9, e os dois tinham a mesma raiz: eu troquei os antigos `<Card>` por `<div>` sem estilo ao reorganizar a página.
+
+- **"Não está cabendo"**: nomes completos de desenvolvedores (bem longos, como é comum aqui) apareciam como badge/pill — e badge é `shrink-0` e `whitespace-nowrap` por definição, então um nome comprido simplesmente força a badge para fora da barra lateral de 20rem, que aí fica cortada pelo `overflow-x-hidden` da página (mesma classe de bug do modal de tarefa, semana passada: esconder overflow sem resolver a causa só troca "barra de rolagem" por "conteúdo sumindo"). Troquei as badges de equipe (na barra lateral e no painel de controle) por linhas com avatar, que quebram/truncam texto normalmente em vez de recusar encolher.
+- **"Tudo cinza"**: a página não tinha o `bg-muted/50` (fundo cinza claro) que toda outra página do sistema usa, e os blocos que eu criei não tinham `bg-card` (branco) — e `--background` e `--card` são exatamente a mesma cor (branco) no tema, então sem esse fundo cinza por baixo, os blocos brancos ficavam invisíveis um do outro, só com uma borda fina cinza para separar. Voltei a usar o componente `<Card>` (que já tem fundo branco) nos blocos, adicionei o fundo cinza claro na página, e dei um tom azul claro (`bg-sky-50`) ao bloco de status/controles, a pedido, para destacar a área de ação principal.
+
+
 ## 2026-09-24 (continuação) — Fase 9: detalhe do projeto em estilo Jira
 
 Escopo combinado antes de começar: reorganização visual reaproveitando o que já existe, sem recurso novo, mantendo o chat. Virou um layout de duas colunas — título, descrição, justificativa, campos adicionais, tarefas e o chat na coluna principal; status, prioridade, categoria, equipe, solicitante e datas numa barra lateral estreita e fixa (`sticky`), do mesmo jeito que o diálogo de tarefa (`TaskFormFields`) já fazia — mesma linguagem visual nos dois lugares agora. Nenhum dado novo, nenhuma ação nova: só reposicionamento.

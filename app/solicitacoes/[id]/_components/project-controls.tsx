@@ -13,6 +13,7 @@ import { toast } from "sonner";
 
 import { assignDeveloper, removeDeveloper } from "@/actions/projectActions";
 import { updateProjectStatusRestricted } from "@/actions/solicitacaoActions";
+import { UserAvatar } from "@/app/kanban/_components/board-ui";
 import { OpenTasksDialog } from "@/components/open-tasks-dialog";
 import { ProjectUpdateForm } from "@/components/project-update-form";
 import { useStatusChangeGuard } from "@/components/use-status-change";
@@ -183,21 +184,27 @@ export function ProjectControls({
             <div className="grid gap-1.5 border-t border-border/60 pt-4">
               <Label>Equipe</Label>
               {assignedDevelopers.length ? (
-                <div className="flex flex-wrap gap-2">
+                <ul className="grid gap-1.5">
                   {assignedDevelopers.map((dev) => (
-                    <Badge key={dev.id} variant="outline" className="gap-2">
-                      {dev.name}
+                    <li
+                      key={dev.id}
+                      className="flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-accent/60"
+                    >
+                      <UserAvatar name={dev.name} />
+                      <span className="min-w-0 flex-1 truncate text-sm">
+                        {dev.name}
+                      </span>
                       <button
                         type="button"
-                        className="text-xs text-muted-foreground hover:text-foreground"
+                        className="shrink-0 text-xs text-muted-foreground hover:text-foreground"
                         onClick={() => handleRemove(dev.id)}
                         disabled={isPending}
                       >
                         Remover
                       </button>
-                    </Badge>
+                    </li>
                   ))}
-                </div>
+                </ul>
               ) : (
                 <p className="text-sm text-muted-foreground">
                   Ninguém atribuído ainda.
@@ -228,13 +235,16 @@ export function ProjectControls({
           ) : assignedDevelopers.length ? (
             <div className="grid gap-1.5 border-t border-border/60 pt-4">
               <Label>Equipe</Label>
-              <div className="flex flex-wrap gap-2">
+              <ul className="grid gap-1.5">
                 {assignedDevelopers.map((dev) => (
-                  <Badge key={dev.id} variant="outline">
-                    {dev.name}
-                  </Badge>
+                  <li key={dev.id} className="flex items-center gap-2">
+                    <UserAvatar name={dev.name} />
+                    <span className="min-w-0 flex-1 truncate text-sm">
+                      {dev.name}
+                    </span>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
           ) : null}
         </div>

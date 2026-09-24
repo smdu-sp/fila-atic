@@ -9,10 +9,18 @@ import {
   listAssignableDevelopers,
   listProjectMessages,
 } from "@/actions/solicitacaoActions";
+import { UserAvatar } from "@/app/kanban/_components/board-ui";
 import { AppSidebar } from "@/components/app-sidebar";
 import { DueBadge } from "@/components/due-badge";
 import { RequesterActions } from "@/components/requester-actions";
 import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { listTasksByProject } from "@/actions/taskActions";
 import { listTaskStatusLabels } from "@/actions/taskStatusActions";
@@ -101,7 +109,7 @@ export default async function SolicitacaoDetalhePage({
             title="Detalhes"
             subtitle={`${formatProjectCode(details.code)} · ${details.title}`}
           />
-          <div className="grid w-full min-w-0 gap-4 p-4 pt-6 sm:p-6 sm:pt-4">
+          <div className="grid w-full min-w-0 gap-4 bg-muted/50 p-4 pt-6 sm:p-6 sm:pt-4">
             <Link
               href="/"
               className="justify-self-end text-sm text-primary underline-offset-4 hover:underline"
@@ -130,62 +138,71 @@ export default async function SolicitacaoDetalhePage({
 
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
               {/* Main column: what the request is, its tasks, the chat. */}
-              <div className="grid min-w-0 content-start gap-6">
-                <div className="grid gap-2">
-                  <p className="font-mono text-xs text-muted-foreground">
-                    {formatProjectCode(details.code)}
-                  </p>
-                  <h1 className="text-2xl font-semibold">{details.title}</h1>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge
-                      variant="outline"
-                      className={getStatusBadgeClass(details.status)}
-                    >
-                      {getStatusLabel(details.status)}
-                    </Badge>
-                    {!isRequester ? (
-                      <Badge variant="secondary">
-                        {getPriorityLabel(details.priority)}
+              <div className="grid min-w-0 content-start gap-4">
+                <Card>
+                  <CardHeader>
+                    <p className="font-mono text-xs text-muted-foreground">
+                      {formatProjectCode(details.code)}
+                    </p>
+                    <CardTitle className="text-2xl leading-snug break-words">
+                      {details.title}
+                    </CardTitle>
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      <Badge
+                        variant="outline"
+                        className={getStatusBadgeClass(details.status)}
+                      >
+                        {getStatusLabel(details.status)}
                       </Badge>
-                    ) : null}
-                    {details.category ? (
-                      <Badge variant="outline">
-                        {getCategoryLabel(details.category)}
-                      </Badge>
-                    ) : null}
-                    <DueBadge dueDate={details.dueDate} closed={isClosed} />
-                  </div>
-                </div>
-
-                <div className="grid gap-2">
-                  <p className={sectionLabelClassName}>Descrição</p>
-                  <p className="text-sm whitespace-pre-wrap text-foreground">
-                    {details.description}
-                  </p>
-                </div>
-
-                <div className="grid gap-2">
-                  <p className={sectionLabelClassName}>Justificativa</p>
-                  <p className="text-sm whitespace-pre-wrap text-foreground">
-                    {details.justification}
-                  </p>
-                </div>
-
-                {details.customFields.length ? (
-                  <div className="grid gap-3">
-                    <p className={sectionLabelClassName}>Campos adicionais</p>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {details.customFields.map((field) => (
-                        <div key={field.label}>
-                          <p className="text-xs text-muted-foreground">
-                            {field.label}
-                          </p>
-                          <p className="text-sm font-medium">{field.value}</p>
-                        </div>
-                      ))}
+                      {!isRequester ? (
+                        <Badge variant="secondary">
+                          {getPriorityLabel(details.priority)}
+                        </Badge>
+                      ) : null}
+                      {details.category ? (
+                        <Badge variant="outline">
+                          {getCategoryLabel(details.category)}
+                        </Badge>
+                      ) : null}
+                      <DueBadge dueDate={details.dueDate} closed={isClosed} />
                     </div>
-                  </div>
-                ) : null}
+                  </CardHeader>
+                  <CardContent className="grid gap-4">
+                    <div className="grid gap-2">
+                      <p className={sectionLabelClassName}>Descrição</p>
+                      <p className="text-sm whitespace-pre-wrap break-words text-foreground">
+                        {details.description}
+                      </p>
+                    </div>
+
+                    <div className="grid gap-2">
+                      <p className={sectionLabelClassName}>Justificativa</p>
+                      <p className="text-sm whitespace-pre-wrap break-words text-foreground">
+                        {details.justification}
+                      </p>
+                    </div>
+
+                    {details.customFields.length ? (
+                      <div className="grid gap-3">
+                        <p className={sectionLabelClassName}>
+                          Campos adicionais
+                        </p>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {details.customFields.map((field) => (
+                            <div key={field.label} className="min-w-0">
+                              <p className="text-xs text-muted-foreground">
+                                {field.label}
+                              </p>
+                              <p className="text-sm font-medium break-words">
+                                {field.value}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </CardContent>
+                </Card>
 
                 {!isRequester ? (
                   <ProjectTasksPanel
@@ -205,144 +222,149 @@ export default async function SolicitacaoDetalhePage({
                   />
                 ) : null}
 
-                <div className="grid gap-4 rounded-xl border border-border/60 p-4 sm:p-6">
-                  <div>
-                    <h2 className="text-base font-semibold">
-                      Histórico de mensagens
-                    </h2>
-                    <p className="text-sm text-muted-foreground">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Histórico de mensagens</CardTitle>
+                    <CardDescription>
                       Comunicações entre solicitante e equipe.
-                    </p>
-                  </div>
-                  {!messagesResult.success ? (
-                    <div className="text-sm text-destructive">
-                      {messagesResult.error}
-                    </div>
-                  ) : null}
-                  {messages.length ? (
-                    <div className="grid gap-3">
-                      {messages.map((item) => {
-                        const isOwn = item.authorName === currentUserName;
-                        const attachmentClasses = isOwn
-                          ? "border-primary/30 bg-primary/10 text-primary-foreground"
-                          : "border-border/60 bg-background/70 text-foreground";
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="grid gap-4">
+                    {!messagesResult.success ? (
+                      <div className="text-sm text-destructive">
+                        {messagesResult.error}
+                      </div>
+                    ) : null}
+                    {messages.length ? (
+                      <div className="grid gap-3">
+                        {messages.map((item) => {
+                          const isOwn = item.authorName === currentUserName;
+                          const attachmentClasses = isOwn
+                            ? "border-primary/30 bg-primary/10 text-primary-foreground"
+                            : "border-border/60 bg-background/70 text-foreground";
 
-                        return (
-                          <div
-                            key={item.id}
-                            className={`flex ${
-                              isOwn ? "justify-end" : "justify-start"
-                            }`}
-                          >
+                          return (
                             <div
-                              className={`max-w-[85%] rounded-2xl border px-4 py-3 text-sm shadow-sm ${
-                                isOwn
-                                  ? "bg-primary text-primary-foreground border-primary/20"
-                                  : "bg-muted/60 text-foreground border-border/60"
+                              key={item.id}
+                              className={`flex ${
+                                isOwn ? "justify-end" : "justify-start"
                               }`}
                             >
                               <div
-                                className={`flex flex-wrap items-center justify-between gap-2 text-[11px] ${
+                                className={`max-w-[85%] rounded-2xl border px-4 py-3 text-sm shadow-sm ${
                                   isOwn
-                                    ? "text-primary-foreground/70"
-                                    : "text-muted-foreground"
+                                    ? "bg-primary text-primary-foreground border-primary/20"
+                                    : "bg-muted/60 text-foreground border-border/60"
                                 }`}
                               >
-                                <span>{item.authorName}</span>
-                                <span>
-                                  {item.createdAt.toLocaleDateString("pt-BR", {
-                                    day: "2-digit",
-                                    month: "2-digit",
-                                    year: "numeric",
-                                  })}
-                                </span>
-                              </div>
-                              {item.message ? (
-                                <p className="mt-2 text-sm leading-relaxed">
-                                  {item.message}
-                                </p>
-                              ) : null}
-                              {item.attachments.length ? (
-                                <div className="mt-3 grid gap-2">
-                                  {item.attachments.map((file) =>
-                                    file.fileType?.startsWith("image/") ? (
-                                      <a
-                                        key={file.id}
-                                        href={file.fileUrl}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className={`block overflow-hidden rounded-lg border ${attachmentClasses}`}
-                                        download={file.fileName}
-                                      >
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img
-                                          src={file.fileUrl}
-                                          alt={file.fileName}
-                                          className="h-40 w-full object-cover"
-                                        />
-                                        <div className="flex items-center justify-between gap-2 px-2 py-1 text-[11px]">
-                                          <span className="truncate">
-                                            {truncateFileName(file.fileName)}
+                                <div
+                                  className={`flex flex-wrap items-center justify-between gap-2 text-[11px] ${
+                                    isOwn
+                                      ? "text-primary-foreground/70"
+                                      : "text-muted-foreground"
+                                  }`}
+                                >
+                                  <span>{item.authorName}</span>
+                                  <span>
+                                    {item.createdAt.toLocaleDateString(
+                                      "pt-BR",
+                                      {
+                                        day: "2-digit",
+                                        month: "2-digit",
+                                        year: "numeric",
+                                      },
+                                    )}
+                                  </span>
+                                </div>
+                                {item.message ? (
+                                  <p className="mt-2 text-sm leading-relaxed">
+                                    {item.message}
+                                  </p>
+                                ) : null}
+                                {item.attachments.length ? (
+                                  <div className="mt-3 grid gap-2">
+                                    {item.attachments.map((file) =>
+                                      file.fileType?.startsWith("image/") ? (
+                                        <a
+                                          key={file.id}
+                                          href={file.fileUrl}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className={`block overflow-hidden rounded-lg border ${attachmentClasses}`}
+                                          download={file.fileName}
+                                        >
+                                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                                          <img
+                                            src={file.fileUrl}
+                                            alt={file.fileName}
+                                            className="h-40 w-full object-cover"
+                                          />
+                                          <div className="flex items-center justify-between gap-2 px-2 py-1 text-[11px]">
+                                            <span className="truncate">
+                                              {truncateFileName(file.fileName)}
+                                            </span>
+                                            <span>
+                                              {formatFileSize(file.fileSize)}
+                                            </span>
+                                          </div>
+                                        </a>
+                                      ) : (
+                                        <a
+                                          key={file.id}
+                                          href={file.fileUrl}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className={`flex items-center justify-between gap-2 rounded-lg border px-2 py-1 text-[11px] ${attachmentClasses}`}
+                                          download={file.fileName}
+                                        >
+                                          <span className="flex min-w-0 items-center gap-2">
+                                            <FileText
+                                              className="h-4 w-4 shrink-0"
+                                              aria-hidden="true"
+                                            />
+                                            <span className="truncate">
+                                              {truncateFileName(file.fileName)}
+                                            </span>
                                           </span>
                                           <span>
                                             {formatFileSize(file.fileSize)}
                                           </span>
-                                        </div>
-                                      </a>
-                                    ) : (
-                                      <a
-                                        key={file.id}
-                                        href={file.fileUrl}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className={`flex items-center justify-between gap-2 rounded-lg border px-2 py-1 text-[11px] ${attachmentClasses}`}
-                                        download={file.fileName}
-                                      >
-                                        <span className="flex min-w-0 items-center gap-2">
-                                          <FileText
-                                            className="h-4 w-4 shrink-0"
-                                            aria-hidden="true"
-                                          />
-                                          <span className="truncate">
-                                            {truncateFileName(file.fileName)}
-                                          </span>
-                                        </span>
-                                        <span>
-                                          {formatFileSize(file.fileSize)}
-                                        </span>
-                                      </a>
-                                    ),
-                                  )}
-                                </div>
-                              ) : null}
+                                        </a>
+                                      ),
+                                    )}
+                                  </div>
+                                ) : null}
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      Nenhuma mensagem registrada.
-                    </p>
-                  )}
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        Nenhuma mensagem registrada.
+                      </p>
+                    )}
 
-                  {isRequester ? <MessageForm projectId={details.id} /> : null}
-                  {canRespond ? (
-                    <MessageForm
-                      projectId={details.id}
-                      triggerLabel="Responder"
-                      dialogTitle="Enviar resposta"
-                      dialogDescription="Escreva uma resposta para o solicitante."
-                      successMessage="Resposta enviada."
-                    />
-                  ) : null}
-                </div>
+                    {isRequester ? (
+                      <MessageForm projectId={details.id} />
+                    ) : null}
+                    {canRespond ? (
+                      <MessageForm
+                        projectId={details.id}
+                        triggerLabel="Responder"
+                        dialogTitle="Enviar resposta"
+                        dialogDescription="Escreva uma resposta para o solicitante."
+                        successMessage="Resposta enviada."
+                      />
+                    ) : null}
+                  </CardContent>
+                </Card>
               </div>
 
               {/* Right sidebar: status/priority controls, team, reporter, dates. */}
               <aside className="grid min-w-0 content-start gap-4 lg:sticky lg:top-4">
                 {!isRequester ? (
-                  <div className="rounded-xl border border-border/60 p-4">
+                  <div className="rounded-xl bg-sky-50 p-4 ring-1 ring-sky-200/70 dark:bg-sky-950/20 dark:ring-sky-900/40">
                     <ProjectControls
                       projectId={details.id}
                       role={session?.user?.role ?? Role.REQUESTER}
@@ -360,48 +382,55 @@ export default async function SolicitacaoDetalhePage({
                     />
                   </div>
                 ) : details.developers.length ? (
-                  <div className="grid gap-1.5 rounded-xl border border-border/60 p-4">
-                    <p className={sectionLabelClassName}>Equipe</p>
-                    <div className="flex flex-wrap gap-2">
-                      {details.developers.map((dev) => (
-                        <Badge key={dev.id} variant="outline">
-                          {dev.name}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
+                  <Card>
+                    <CardContent className="grid gap-1.5">
+                      <p className={sectionLabelClassName}>Equipe</p>
+                      <ul className="grid gap-1.5">
+                        {details.developers.map((dev) => (
+                          <li key={dev.id} className="flex items-center gap-2">
+                            <UserAvatar name={dev.name} />
+                            <span className="min-w-0 flex-1 truncate text-sm">
+                              {dev.name}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
                 ) : null}
 
-                <div className="grid gap-3 rounded-xl border border-border/60 p-4">
-                  <div className="grid gap-1">
-                    <p className={sectionLabelClassName}>Solicitante</p>
-                    <span className="text-sm font-medium">
-                      {details.requester.name}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {details.requester.department}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {details.requester.email}
-                    </span>
-                  </div>
-                  <div className="grid gap-1 border-t border-border/60 pt-3">
-                    <p className={sectionLabelClassName}>Criado em</p>
-                    <span className="text-sm">
-                      {details.createdAt.toLocaleDateString("pt-BR")}
-                    </span>
-                  </div>
-                  {details.dueDate ? (
-                    <div className="grid gap-1 border-t border-border/60 pt-3">
-                      <p className={sectionLabelClassName}>
-                        Previsão de entrega
-                      </p>
-                      <span className="text-sm">
-                        {formatDueDate(details.dueDate)}
+                <Card>
+                  <CardContent className="grid gap-3">
+                    <div className="grid min-w-0 gap-1">
+                      <p className={sectionLabelClassName}>Solicitante</p>
+                      <span className="break-words text-sm font-medium">
+                        {details.requester.name}
+                      </span>
+                      <span className="break-words text-xs text-muted-foreground">
+                        {details.requester.department}
+                      </span>
+                      <span className="break-words text-xs text-muted-foreground">
+                        {details.requester.email}
                       </span>
                     </div>
-                  ) : null}
-                </div>
+                    <div className="grid gap-1 border-t border-border/60 pt-3">
+                      <p className={sectionLabelClassName}>Criado em</p>
+                      <span className="text-sm">
+                        {details.createdAt.toLocaleDateString("pt-BR")}
+                      </span>
+                    </div>
+                    {details.dueDate ? (
+                      <div className="grid gap-1 border-t border-border/60 pt-3">
+                        <p className={sectionLabelClassName}>
+                          Previsão de entrega
+                        </p>
+                        <span className="text-sm">
+                          {formatDueDate(details.dueDate)}
+                        </span>
+                      </div>
+                    ) : null}
+                  </CardContent>
+                </Card>
               </aside>
             </div>
           </div>
