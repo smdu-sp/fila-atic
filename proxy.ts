@@ -20,10 +20,11 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   // Reachable without a session: login, the scheduler endpoint (/api/cron, which
-  // checks its own secret), the public request form
+  // checks its own secret), the GitHub workflows' endpoint
+  // (/api/integrations/github, same idea), the public request form
   // (/solicitar), guest tracking links (/acompanhar/<token>) and public
   // images (favicon, login artwork).
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|api/auth|api/cron|login|solicitar(?:/|$)|acompanhar(?:/|$)|.*\\.(?:png|jpe?g|svg|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|api/auth|api/cron|api/integrations/github|login|solicitar(?:/|$)|acompanhar(?:/|$)|.*\\.(?:png|jpe?g|svg|webp|ico)$).*)",
   ],
 };

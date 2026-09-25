@@ -1,0 +1,59 @@
+name: Fila ATIC sync
+
+# Tells Fila ATIC about commits and pull requests, so tasks that cite their
+# code (ATC-0001-3) show the activity and move on the Kanban board.
+#
+# It runs on the self-hosted runner installed on the server: that machine can
+# reach the internal Fila ATIC address, GitHub's own runners cannot. Setup and
+# the two values it needs (variable FILA_ATIC_URL, secret FILA_ATIC_TOKEN) are
+# described in docs/github-runner.md.
+#
+# pull_request_target (not pull_request) on purpose: the workflow and the
+# script always come from the default branch, never from the pull request
+# being examined, so a pull request cannot change them to read the token. The
+# job never checks out or runs code from the pull request.
+on:
+  push:
+  pull_request_target:
+    types: [opened, reopened, ready_for_review, closed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fila-atic-sync-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    runs-on: [self-hosted, fila-atic]
+    timeout-minutes: 5
+    env:
+      FILA_ATIC_URL: ${{ vars.FILA_ATIC_URL }}
+      FILA_ATIC_TOKEN: ${{ secrets.FILA_ATIC_TOKEN }}
+    steps:
+      # the default branch's copy of the script; for a push it is the pushed
+      # commit, which is also where git can list more commits than the event has
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.repository.default_branch || github.sha }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Tell Fila ATIC about the push
+        if: github.event_name == 'push'
+        run: node scripts/github-notify.mjs push
+
+      - name: Tell Fila ATIC about the pull request
+        if: github.event_name == 'pull_request_target'
+        run: node scripts/github-notify.mjs pull_request
+
+      # Run it by hand (Actions > Fila ATIC sync > Run workflow) after the
+      # installation: it must answer "Teste de conexão".
+      - name: Test the connection
+        if: github.event_name == 'workflow_dispatch'
+        run: node scripts/github-notify.mjs ping

@@ -63,6 +63,7 @@ Sem o passo 5 não há quem cadastre os demais usuários. Se o e-mail já existi
 | `LDAP_BIND_DN` / `LDAP_BIND_PASSWORD` | Usuário de serviço (ou `USER_LDAP` + `LDAP_DOMAIN` / `PASS_LDAP`) |
 | `ENVIRONMENT` | `local` pula o LDAP e aceita qualquer senha não vazia |
 | `PUBLIC_REQUEST_ALLOWED_DOMAINS` | Domínios de e-mail (separados por vírgula) que podem abrir solicitações em `/solicitar` sem conta. Vazio desativa a função |
+| `GITHUB_INTEGRATION_TOKEN` | Segredo (bearer) que autoriza os workflows do GitHub a chamar `/api/integrations/github`. Vazio desativa a rota. Gerar com `openssl rand -hex 32`; o mesmo valor vai no segredo `FILA_ATIC_TOKEN` do GitHub |
 | `CRON_SECRET` | Segredo que autoriza o agendador a chamar `/api/cron/deadline-reminders` (avisos de prazo). Vazio desativa a rota |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | Envio de e-mails (confirmação e avisos). Sem `SMTP_HOST`, fora de produção o e-mail é impresso no console |
 
@@ -140,4 +141,12 @@ Os anexos das mensagens e das tarefas ficam em `storage/uploads/` (fora de `publ
 
 ## CI
 
-`.github/workflows/ci.yml` roda em todo push em `main` e em toda pull request: lint, `tsc --noEmit`, a suíte de testes (contra um Postgres descartável, criado pelo próprio workflow) e um build de produção. Ainda não há deploy automático (CD) — fica para quando definirmos onde e como o sistema é hospedado.
+`.github/workflows/ci.yml` roda em todo push em `main` e em toda pull request: lint, `tsc --noEmit`, a suíte de testes (contra um Postgres descartável, criado pelo próprio workflow) e um build de produção, nos runners do GitHub.
+
+## Integração com o GitHub (Kanban automático e deploy)
+
+Cada tarefa tem um **código**: o do projeto mais o número dela dentro do projeto (`ATC-0001-3`), mostrado no cartão, no diálogo e na lista de tarefas do projeto. Quem cita o código na mensagem de um commit, no título/descrição de um pull request ou no nome da branch faz a tarefa registrar a atividade (seção **GitHub** do diálogo, com links) e mudar de coluna: commit em branch → Em andamento, PR aberto → Em testes, PR integrado ou commit na `main` → Concluído, deploy em produção → Publicado. A tarefa só avança (configurável) e tarefa cancelada nunca é reativada. A coordenação liga a integração e ajusta as regras em **Administração → GitHub**, onde também vê os últimos eventos recebidos (inclusive os ignorados e o motivo).
+
+Como o servidor não é acessível pela internet, não há webhook: um **runner auto-hospedado** instalado no próprio servidor executa os workflows `fila-atic-sync.yml` (avisa o sistema de push e pull request via `scripts/github-notify.mjs` → `POST /api/integrations/github`, autenticado por `GITHUB_INTEGRATION_TOKEN`) e `deploy.yml` (CD com regras: só a `main` com CI verde, aprovação no ambiente `production`, um deploy por vez, backup opcional, migrations, build, verificação de saúde e retorno automático à versão anterior se falhar — `scripts/deploy.mjs`).
+
+**Guia completo de instalação do runner, configuração do servidor, do GitHub e do sistema, teste ponta a ponta e solução de problemas: [`docs/github-runner.md`](docs/github-runner.md).**

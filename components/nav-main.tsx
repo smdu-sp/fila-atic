@@ -9,6 +9,7 @@ import {
   BookOpenIcon,
   FileTextIcon,
   FolderIcon,
+  GitBranchIcon,
   LayoutIcon,
   ListIcon,
   SettingsIcon,
@@ -81,6 +82,12 @@ const menuAdmin = [
     title: "Configurar formulário",
     url: "/administracao/solicitacao",
     icon: SettingsIcon,
+    roles: COORDINATION_ROLES,
+  },
+  {
+    title: "GitHub",
+    url: "/administracao/github",
+    icon: GitBranchIcon,
     roles: COORDINATION_ROLES,
   },
   {

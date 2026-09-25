@@ -1,0 +1,75 @@
+name: Deploy
+
+# Puts the main branch in production, on the server itself, through the
+# self-hosted runner. The rules of a deploy:
+#
+#   1. Only commits of main, and only after the CI workflow passed on them
+#      (workflow_run below), or a person starting it by hand.
+#   2. The job belongs to the "production" environment. In Settings >
+#      Environments > production, add "Required reviewers" (approval before
+#      each deploy) and restrict "Deployment branches" to main.
+#   3. One deploy at a time (concurrency), never cancelled half way.
+#   4. If the build or the health check fails, the previous commit is built
+#      and started again (scripts/deploy.mjs).
+#
+# Run by hand (Actions > Deploy > Run workflow) to deploy a specific commit,
+# which is also how a bad release is rolled back: give the previous commit.
+# Full explanation and the server setup: docs/github-runner.md.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Commit to deploy (empty: the tip of main)"
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # a red CI never reaches production
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: [self-hosted, fila-atic]
+    environment: production
+    timeout-minutes: 30
+    env:
+      SHA: ${{ inputs.sha || github.event.workflow_run.head_sha || github.sha }}
+      FILA_ATIC_APP_DIR: ${{ vars.FILA_ATIC_APP_DIR }}
+      FILA_ATIC_RESTART_CMD: ${{ vars.FILA_ATIC_RESTART_CMD }}
+      FILA_ATIC_HEALTH_URL: ${{ vars.FILA_ATIC_HEALTH_URL }}
+      FILA_ATIC_BACKUP_CMD: ${{ vars.FILA_ATIC_BACKUP_CMD }}
+      FILA_ATIC_HEALTH_WAIT: ${{ vars.FILA_ATIC_HEALTH_WAIT }}
+      FILA_ATIC_URL: ${{ vars.FILA_ATIC_URL }}
+      FILA_ATIC_TOKEN: ${{ secrets.FILA_ATIC_TOKEN }}
+    steps:
+      # only for the scripts; the application is built in FILA_ATIC_APP_DIR
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SHA }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Deploy
+        run: node scripts/deploy.mjs --sha "$SHA" --commits-file "$RUNNER_TEMP/deploy-commits.json"
+
+      # Fila ATIC moves the tasks of the deployed commits to "Publicado" (or
+      # records the failure). A problem here never fails the deploy itself.
+      - name: Tell Fila ATIC the deploy went well
+        if: success()
+        continue-on-error: true
+        run: node scripts/github-notify.mjs deploy --status success --environment production --branch main --commits-file "$RUNNER_TEMP/deploy-commits.json"
+
+      - name: Tell Fila ATIC the deploy failed
+        if: failure()
+        continue-on-error: true
+        run: node scripts/github-notify.mjs deploy --status failure --environment production --branch main --commits-file "$RUNNER_TEMP/deploy-commits.json"
