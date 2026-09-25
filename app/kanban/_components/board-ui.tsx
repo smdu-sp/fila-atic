@@ -481,6 +481,7 @@ function LabelsPicker({
 
 export function TaskCard({
   id,
+  code,
   title,
   createdAt,
   assigneeId,
@@ -506,6 +507,8 @@ export function TaskCard({
   onChanged,
 }: CardDragProps & {
   id: string;
+  // "ATC-0001-3"
+  code: string;
   title: string;
   createdAt: string | Date;
   assigneeId: string | null;
@@ -617,6 +620,8 @@ export function TaskCard({
             className="-m-0.5 w-[calc(100%+0.25rem)] rounded border border-ring bg-background p-0.5 font-medium leading-snug text-card-foreground outline-none"
           />
         ) : (
+          <>
+          <p className="font-mono text-[11px] text-muted-foreground">{code}</p>
           <p
             className={cn(
               "line-clamp-3 font-medium leading-snug",
@@ -633,6 +638,7 @@ export function TaskCard({
           >
             {title}
           </p>
+          </>
         )}
         {projectTitle ? (
           <p className="mt-1 truncate text-[11px] text-muted-foreground">

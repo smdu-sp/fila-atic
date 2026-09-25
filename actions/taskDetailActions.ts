@@ -13,7 +13,7 @@ import {
   saveUploads,
   validateUploads,
 } from "@/lib/uploads";
-import { Role } from "@prisma/client";
+import { Role, type TaskStatus } from "@prisma/client";
 
 // Comments and files of a task. Tasks are internal work: requesters never see
 // them, and everyone else needs access to the project.
@@ -38,6 +38,18 @@ export type TaskAttachmentItem = {
   fileSize: number;
   uploadedById: string;
   uploadedByName: string;
+  createdAt: Date;
+};
+
+// A commit, pull request or deploy that cited the task (see lib/githubSync.ts).
+export type TaskGithubActivityItem = {
+  id: string;
+  kind: string;
+  title: string;
+  url: string | null;
+  sha: string | null;
+  author: string | null;
+  movedTo: TaskStatus | null;
   createdAt: Date;
 };
 
@@ -76,12 +88,16 @@ function refresh(projectId: string) {
 export async function getTaskDetails(
   taskId: string,
 ): Promise<
-  ActionResult<{ comments: TaskComment[]; attachments: TaskAttachmentItem[] }>
+  ActionResult<{
+    comments: TaskComment[];
+    attachments: TaskAttachmentItem[];
+    activity: TaskGithubActivityItem[];
+  }>
 > {
   const access = await accessTo(taskId);
   if (!access.ok) return { success: false, error: access.error };
 
-  const [comments, attachments] = await Promise.all([
+  const [comments, attachments, activity] = await Promise.all([
     prisma.taskComment.findMany({
       where: { taskId },
       orderBy: { createdAt: "asc" },
@@ -107,9 +123,24 @@ export async function getTaskDetails(
         createdAt: true,
       },
     }),
+    prisma.taskGithubActivity.findMany({
+      where: { taskId },
+      orderBy: { createdAt: "desc" },
+      take: 30,
+      select: {
+        id: true,
+        kind: true,
+        title: true,
+        url: true,
+        sha: true,
+        author: true,
+        movedTo: true,
+        createdAt: true,
+      },
+    }),
   ]);
 
-  return { success: true, data: { comments, attachments } };
+  return { success: true, data: { comments, attachments, activity } };
 }
 
 export async function addTaskComment(input: {

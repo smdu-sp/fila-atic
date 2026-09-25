@@ -44,6 +44,7 @@ import { isTaskOpen, summarizeTasks } from "@/lib/taskStatus";
 
 type PanelTask = {
   id: string;
+  code: string;
   title: string;
   status: TaskStatus;
   priority: ProjectPriority;
@@ -167,6 +168,9 @@ function TasksPanel({
               >
                 <span className="flex min-w-0 items-center gap-2">
                   <PriorityIcon priority={task.priority} />
+                  <span className="shrink-0 font-mono text-xs text-muted-foreground">
+                    {task.code}
+                  </span>
                   <span
                     className={
                       task.status === TaskStatus.CANCELED

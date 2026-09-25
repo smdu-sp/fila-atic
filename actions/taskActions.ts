@@ -10,6 +10,7 @@ import { canAccessProject } from "@/lib/projectAccess";
 import { formatDueDate, parseDateInput, toDateInput } from "@/lib/dueDate";
 import { getPriorityLabel, getTaskStatusLabel } from "@/lib/projectLabels";
 import { resolveTaskLabels } from "@/lib/labelPalette";
+import { formatTaskCode } from "@/lib/taskCode";
 import { LABELS_ERROR, normalizeLabels } from "@/lib/taskFields";
 import { deleteUploads } from "@/lib/uploads";
 import { touchProject } from "@/lib/projectStatus";
@@ -436,6 +437,8 @@ export async function listTasksByProject(projectId: string): Promise<
   ActionResult<
     Array<{
       id: string;
+      // "ATC-0001-3"
+      code: string;
       title: string;
       description: string | null;
       status: TaskStatus;
@@ -472,6 +475,8 @@ export async function listTasksByProject(projectId: string): Promise<
     where: { projectId },
     select: {
       id: true,
+      number: true,
+      project: { select: { code: true } },
       title: true,
       description: true,
       status: true,
@@ -489,8 +494,9 @@ export async function listTasksByProject(projectId: string): Promise<
 
   return {
     success: true,
-    data: tasks.map(({ assignee, _count, ...task }) => ({
+    data: tasks.map(({ assignee, _count, number, project, ...task }) => ({
       ...task,
+      code: formatTaskCode(project.code, number),
       assigneeName: assignee?.name ?? null,
       commentCount: _count.comments,
       attachmentCount: _count.attachments,
@@ -503,6 +509,7 @@ export async function listMyTasks(): Promise<
   ActionResult<
     Array<{
       id: string;
+      code: string;
       title: string;
       description: string | null;
       status: TaskStatus;
@@ -537,6 +544,7 @@ export async function listMyTasks(): Promise<
     },
     select: {
       id: true,
+      number: true,
       title: true,
       description: true,
       status: true,
@@ -547,15 +555,16 @@ export async function listMyTasks(): Promise<
       position: true,
       _count: { select: { comments: true, attachments: true } },
       createdAt: true,
-      project: { select: { id: true, title: true } },
+      project: { select: { id: true, code: true, title: true } },
     },
     orderBy: { updatedAt: "desc" },
   });
 
   return {
     success: true,
-    data: tasks.map(({ project, _count, ...task }) => ({
+    data: tasks.map(({ project, _count, number, ...task }) => ({
       ...task,
+      code: formatTaskCode(project.code, number),
       commentCount: _count.comments,
       attachmentCount: _count.attachments,
       assigneeName: auth.data.name,

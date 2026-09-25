@@ -800,6 +800,7 @@ function KanbanBoard({
                     <TaskCard
                       key={item.id}
                       id={item.id}
+                      code={item.code}
                       title={item.title}
                       createdAt={item.createdAt}
                       assigneeId={item.assigneeId}

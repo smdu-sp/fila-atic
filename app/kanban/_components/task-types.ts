@@ -15,6 +15,8 @@ export const TASK_STATUS_ORDER: TaskStatus[] = [
 
 export type TaskItem = {
   id: string;
+  // "ATC-0001-3": what commits and branches cite to reach this task
+  code: string;
   title: string;
   description: string | null;
   status: TaskStatus;

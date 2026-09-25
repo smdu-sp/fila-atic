@@ -13,6 +13,7 @@ import {
   getTaskDetails,
   type TaskAttachmentItem,
   type TaskComment,
+  type TaskGithubActivityItem,
 } from "@/actions/taskDetailActions";
 import { NO_ASSIGNEE } from "@/app/kanban/_components/assignee-items";
 import { TaskFormFields } from "@/app/kanban/_components/task-fields";
@@ -20,6 +21,7 @@ import {
   AttachmentsSection,
   CommentsSection,
 } from "@/app/kanban/_components/task-extras";
+import { GithubActivitySection } from "@/app/kanban/_components/github-activity";
 import type { TaskItem } from "@/app/kanban/_components/task-types";
 import { Button } from "@/components/ui/button";
 import {
@@ -106,6 +108,7 @@ function TaskDialogBody({
   const [details, setDetails] = useState<{
     comments: TaskComment[];
     attachments: TaskAttachmentItem[];
+    activity: TaskGithubActivityItem[];
   } | null>(null);
   const [detailsError, setDetailsError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -231,7 +234,12 @@ function TaskDialogBody({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>Tarefa</DialogTitle>
+        <DialogTitle className="flex flex-wrap items-baseline gap-x-3">
+          Tarefa
+          <span className="font-mono text-sm font-normal text-muted-foreground">
+            {task.code}
+          </span>
+        </DialogTitle>
         <DialogDescription>
           {task.projectTitle ??
             (canEdit
@@ -265,6 +273,11 @@ function TaskDialogBody({
         disabled={!canEdit}
         mainAfter={
           <>
+            <GithubActivitySection
+              code={task.code}
+              title={task.title}
+              activity={details?.activity ?? []}
+            />
             <AttachmentsSection
               rows={(details?.attachments ?? []).map((attachment) => ({
                 key: attachment.id,
