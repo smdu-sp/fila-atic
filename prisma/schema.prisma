@@ -329,6 +329,27 @@ model Notification {
   @@index([userId, readAt, createdAt])
 }
 
+// One row per e-mail the system attempted to send: notifications, deadline
+// reminders, guest-requester messages, confirmation links, admin test sends.
+// Delivery is otherwise invisible in production (sendMail's caller only logs
+// to the console), so this is what Administracao > E-mail shows.
+model MailLog {
+  id        String   @id @default(uuid())
+  // "confirmation" | "tracking" | "guest_update" | "notification" | "test"
+  kind      String
+  to        String
+  subject   String
+  // "sent" (delivered or handed to the relay) | "skipped" (no SMTP_HOST,
+  // outside production: printed to the console instead) | "failed"
+  status    String
+  // how many attempts it took (>1 means a transient failure was retried)
+  attempts  Int      @default(1)
+  error     String?  @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
 model PendingGuestRequest {
   id            String   @id @default(uuid())
   tokenHash     String   @unique

@@ -12,6 +12,7 @@ import {
   GitBranchIcon,
   LayoutIcon,
   ListIcon,
+  MailIcon,
   SettingsIcon,
   TagsIcon,
   UserIcon,
@@ -82,6 +83,12 @@ const menuAdmin = [
     title: "Configurar formulário",
     url: "/administracao/solicitacao",
     icon: SettingsIcon,
+    roles: COORDINATION_ROLES,
+  },
+  {
+    title: "E-mail",
+    url: "/administracao/email",
+    icon: MailIcon,
     roles: COORDINATION_ROLES,
   },
   {

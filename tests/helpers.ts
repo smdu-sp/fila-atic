@@ -30,7 +30,9 @@ export async function resetDb() {
     ),
   ]);
 
-  vi.mocked(sendMail).mockClear();
+  // Files that test the real lib/mail.ts (tests/unit/mail.test.ts) unmock it,
+  // so sendMail is not a mock function there; resetDb still works for them.
+  if (vi.isMockFunction(sendMail)) vi.mocked(sendMail).mockClear();
   actAs(null);
 }
 

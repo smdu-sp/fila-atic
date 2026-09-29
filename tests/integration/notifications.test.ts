@@ -424,6 +424,20 @@ describe("deadline reminders", () => {
     expect(counts.removed).toBe(2);
     expect((await notificationsOf(dev2.id)).map((n) => n.title).sort()).toEqual(["lida recente", "nao lida recente"]);
   });
+
+  it("cleans up old mail log entries, keeping recent ones", async () => {
+    await prisma.mailLog.createMany({
+      data: [
+        { kind: "notification", to: "a@x.gov.br", subject: "antigo", status: "sent", createdAt: new Date("2026-08-01T00:00:00Z") }, // > 30 days
+        { kind: "notification", to: "b@x.gov.br", subject: "recente", status: "sent", createdAt: new Date("2026-09-28T00:00:00Z") },
+      ],
+    });
+
+    const counts = await runDeadlineReminders(now);
+
+    expect(counts.mailLogs).toBe(1);
+    expect((await prisma.mailLog.findMany()).map((entry) => entry.subject)).toEqual(["recente"]);
+  });
 });
 
 describe("scheduler endpoint", () => {

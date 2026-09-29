@@ -39,7 +39,7 @@ const projectTitle = {
 export async function runDeadlineReminders(now: Date = new Date()) {
   const today = todayInAppZone(now);
   const dateFor = (offset: number) => new Date(today.getTime() + offset * DAY_MS);
-  const counts = { tasks: 0, projects: 0, removed: 0 };
+  const counts = { tasks: 0, projects: 0, removed: 0, mailLogs: 0 };
   const coordination = await coordinationIds();
 
   for (const { offset, phase } of phases) {
@@ -104,6 +104,13 @@ export async function runDeadlineReminders(now: Date = new Date()) {
     },
   });
   counts.removed = removed.count;
+
+  // Housekeeping: the send log (Administração > E-mail) only needs to cover
+  // recent activity; 30 days is enough to notice a relay that started failing.
+  const removedMailLogs = await prisma.mailLog.deleteMany({
+    where: { createdAt: { lt: new Date(now.getTime() - 30 * DAY_MS) } },
+  });
+  counts.mailLogs = removedMailLogs.count;
 
   // unconfirmed public requests, with their uploaded files
   await removeExpiredPending(now);

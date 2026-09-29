@@ -2,6 +2,24 @@
 
 Registro de decisões e entregas do projeto: o que foi pedido, o que foi feito e por quê. Não substitui o `git log` (que tem o detalhe técnico de cada commit) nem o `README.md` (que descreve o sistema como ele é hoje); serve para explicar o raciocínio por trás das mudanças, na ordem em que aconteceram. Entradas mais novas no topo.
 
+## 2026-09-29 — E-mail: configuração para conectar a um servidor de e-mail separado, e visibilidade das entregas
+
+Pedido do usuário: garantir que os avisos por e-mail (equipe e solicitantes) funcionem, sabendo que quem entrega de fato é **outro servidor** (relay já existente na rede) — o servidor do Fila ATIC só se conecta a ele.
+
+Primeiro conferi o que já existia: a lógica de notificação (quem é avisado de quê — nova solicitação, tarefa atribuída, mudança de status, mensagem, prazo) e o envio por e-mail (`lib/notifications.ts`, `lib/guestMail.ts`, `lib/deadlineReminders.ts`) já estavam completos de fases anteriores, com opt-out por pessoa (`Perfil > Notificações`) e a conexão SMTP já parametrizada por `.env` (`lib/mail.ts`). Ou seja, o pedido não era "implementar notificação por e-mail" — isso já existe — e sim **preparar a conexão com esse servidor externo** e dar visibilidade de que ela está funcionando, já que hoje uma falha de envio só aparece como `console.error`, invisível em produção sem acesso ao console.
+
+O que mudou:
+
+- **`lib/mailTransport.ts`** (novo, puro): monta as opções de conexão a partir do `.env` e decide o que vale tentar de novo. Adicionei `SMTP_TLS_REJECT_UNAUTHORIZED` — relay interno de prefeitura frequentemente usa certificado autoassinado ou de CA interna, e sem essa válvula de escape o Node recusaria a conexão TLS por padrão.
+- **`lib/mail.ts`** reescrito: reaproveita uma única conexão entre envios (`pool: true`, importa quando os avisos de prazo mandam várias mensagens na mesma execução), tenta de novo (até 3x, com espera crescente) uma falha que parece passageira (conexão recusada, tempo esgotado) mas **não** repete uma rejeição do próprio relay (endereço inexistente, por exemplo — tentar de novo não muda o resultado), e agora grava cada tentativa em `MailLog` (nova tabela): tipo, destinatário, assunto, resultado (enviado / impresso no console por falta de `SMTP_HOST` / falhou) e quantas tentativas levou.
+- **Administração > E-mail** (nova tela, coordenação e Tech Lead): mostra se `SMTP_HOST` está configurado e com quê (host, porta, autenticação, remetente — nunca usuário/senha), um botão **Enviar e-mail de teste** e os últimos e-mails enviados pelo sistema, com o resultado de cada um. Verificado num navegador real, com um "sink" SMTP local fazendo o papel do relay: sem `SMTP_HOST`, o botão falha com "SMTP nao configurado" e o log mostra a falha (build de produção, sem relay); apontando para o sink (`SMTP_HOST=127.0.0.1 SMTP_PORT=2525`), o e-mail chegou de verdade e o log mostrou "Enviado" — confirmando o próprio cenário que o usuário descreveu (servidor da aplicação diferente do servidor de e-mail, conectando nele).
+- Limpeza: `runDeadlineReminders` agora também apaga `MailLog` com mais de 30 dias, junto da limpeza de notificações que já existia.
+- `.env.example` e o `README.md` (nova seção "E-mail") documentam as variáveis e como configurar o relay — o mesmo modelo de "só precisa de conexão de saída" já usado para o runner do GitHub.
+- 27 testes novos (config pura, política de nova tentativa, `lib/mail.ts` de verdade com nodemailer mockado — arquivo dedicado que desfaz o mock global de `sendMail`, já que todo o resto dos testes assume `sendMail` mockado —, permissões e validação das ações de administração, limpeza do log).
+
+Não mudei as regras de "quem é notificado de quê": já cobrem devs (tarefa atribuída, prazo, comentário, nova solicitação) e solicitantes (mudança de status, previsão de entrega, mensagem da equipe), com e sem conta.
+
+
 ## 2026-09-25 (continuação) — Fase 7: integração com o GitHub (runner no servidor, Kanban automático e CD)
 
 Retomada da fase que estava pausada até o usuário confirmar que consegue criar o runner no servidor. Pedido: um documento detalhado de instalação do runner e o que fosse preciso no sistema.

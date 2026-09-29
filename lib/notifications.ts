@@ -39,6 +39,7 @@ async function emailNotification(
   notification: { title: string; body?: string; href: string },
 ) {
   await sendMail({
+    kind: "notification",
     to: user.email,
     subject: notification.title,
     text: [

@@ -65,7 +65,7 @@ Sem o passo 5 não há quem cadastre os demais usuários. Se o e-mail já existi
 | `PUBLIC_REQUEST_ALLOWED_DOMAINS` | Domínios de e-mail (separados por vírgula) que podem abrir solicitações em `/solicitar` sem conta. Vazio desativa a função |
 | `GITHUB_INTEGRATION_TOKEN` | Segredo (bearer) que autoriza os workflows do GitHub a chamar `/api/integrations/github`. Vazio desativa a rota. Gerar com `openssl rand -hex 32`; o mesmo valor vai no segredo `FILA_ATIC_TOKEN` do GitHub |
 | `CRON_SECRET` | Segredo que autoriza o agendador a chamar `/api/cron/deadline-reminders` (avisos de prazo). Vazio desativa a rota |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | Envio de e-mails (confirmação e avisos). Sem `SMTP_HOST`, fora de produção o e-mail é impresso no console |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `SMTP_TLS_REJECT_UNAUTHORIZED` | Conexão com o servidor de e-mail (relay) que entrega as mensagens — ver seção "E-mail". Sem `SMTP_HOST`, fora de produção o e-mail é impresso no console |
 
 `ENVIRONMENT=local` só vale fora de builds de produção (`NODE_ENV !== "production"`); em produção o LDAP é sempre usado.
 
@@ -94,7 +94,23 @@ Os avisos de prazo não disparam sozinhos: alguém precisa chamar a rota uma vez
 schtasks /create /tn "Fila ATIC - avisos de prazo" /sc daily /st 07:00 /tr "cmd /c cd /d D:\caminho\fila-atic && npm run cron:deadlines"
 ```
 
-Rodar mais de uma vez no dia é seguro: cada aviso é entregue uma única vez. A mesma execução apaga notificações lidas há mais de 60 dias e qualquer uma com mais de 180. Sem o agendador, todos os outros avisos continuam funcionando; só os de prazo deixam de sair.
+Rodar mais de uma vez no dia é seguro: cada aviso é entregue uma única vez. A mesma execução apaga notificações lidas há mais de 60 dias e qualquer uma com mais de 180 (e o log de e-mails com mais de 30, ver abaixo). Sem o agendador, todos os outros avisos continuam funcionando; só os de prazo deixam de sair.
+
+## E-mail
+
+O Fila ATIC não entrega e-mail diretamente: ele se conecta, como cliente SMTP, a um **servidor de e-mail separado** (um relay já existente na rede — Exchange, Postfix, etc.) que é quem de fato envia. É o mesmo modelo da integração com o GitHub (`docs/github-runner.md`): a aplicação só precisa de **conexão de saída** para esse outro servidor, numa porta SMTP (`587` com STARTTLS é o padrão; `465` para TLS implícito); nenhuma porta de entrada é necessária.
+
+Configuração (`.env`, ver tabela acima):
+
+- `SMTP_HOST` / `SMTP_PORT` — endereço do relay. Sem `SMTP_HOST`, fora de produção o e-mail só é impresso no console (nada é entregue); em produção, o envio falha.
+- `SMTP_SECURE="true"` para TLS implícito (porta `465`); deixe `"false"` para STARTTLS (porta `587`, o mais comum em relay interno).
+- `SMTP_USER` / `SMTP_PASS` — só se o relay exigir login. Muitos relays internos aceitam mensagens de qualquer host autorizado na rede (por IP) sem autenticação; nesse caso deixe os dois vazios.
+- `SMTP_FROM` — remetente exibido (`"Fila ATIC <fila@prefeitura.sp.gov.br>"`).
+- `SMTP_TLS_REJECT_UNAUTHORIZED="false"` — só se o relay apresentar um certificado autoassinado ou de uma CA interna (comum em servidor de e-mail que nunca sai da rede da prefeitura). O padrão (`"true"` ou variável ausente) valida o certificado normalmente.
+
+**Administração > E-mail** (coordenação e Tech Lead) mostra se `SMTP_HOST` está configurado, o servidor/porta/remetente em uso (usuário e senha nunca aparecem na tela), um botão para **enviar um e-mail de teste** e os **últimos e-mails** enviados pelo sistema — confirmações, links de acompanhamento, avisos a solicitantes externos e notificações à equipe — cada um com o resultado (enviado, impresso no console por falta de `SMTP_HOST`, ou falhou, com o motivo). É o primeiro lugar para conferir depois de configurar o relay, e o único jeito de perceber uma falha de entrega sem acesso ao console do servidor: por padrão uma falha só aparece ali (`console.error`) e nesse log.
+
+Confiabilidade: cada envio tenta de novo até 3 vezes com espera crescente quando a falha parece passageira (conexão recusada, tempo esgotado); uma rejeição do próprio relay (endereço inexistente, por exemplo) não é repetida, porque tentar de novo não muda o resultado. As conexões são reaproveitadas entre envios (`pool: true`), o que importa quando os avisos de prazo mandam várias mensagens na mesma execução.
 
 ## Tarefas e Kanban
 

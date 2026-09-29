@@ -21,6 +21,7 @@ export async function sendConfirmationEmail(input: {
   const hours = CONFIRM_TOKEN_TTL_MS / 60 / 60 / 1000;
 
   await sendMail({
+    kind: "confirmation",
     to: input.to,
     subject: "Confirme sua solicitação - Fila ATIC",
     text: [
@@ -44,6 +45,7 @@ export async function sendTrackingEmail(input: {
   token: string;
 }) {
   await sendMail({
+    kind: "tracking",
     to: input.to,
     subject: "Solicitação registrada - Fila ATIC",
     text: [
@@ -68,6 +70,7 @@ export async function sendTrackingLinksEmail(input: {
   projects: Array<{ title: string; token: string }>;
 }) {
   await sendMail({
+    kind: "tracking",
     to: input.to,
     subject: "Seus links de acompanhamento - Fila ATIC",
     text: [
@@ -105,6 +108,7 @@ export async function notifyGuestRequester(projectId: string, change: string) {
     if (!project?.trackingToken || !project.requester.isGuest) return;
 
     await sendMail({
+      kind: "guest_update",
       to: project.requester.email,
       subject: `Atualização na solicitação "${project.title}" - Fila ATIC`,
       text: [
