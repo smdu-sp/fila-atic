@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 
+import { renderEmail } from "@/lib/emailTemplate";
 import { sendMail } from "@/lib/mail";
 import { prisma } from "@/lib/prisma";
 import { getAppUrl } from "@/lib/publicRequest";
@@ -31,30 +32,20 @@ type NotifyInput = {
   dedupeKey?: string;
 };
 
-const SIGNATURE =
-  "Fila ATIC - Secretaria Municipal de Urbanismo e Licenciamento";
-
 async function emailNotification(
   user: { name: string; email: string },
   notification: { title: string; body?: string; href: string },
 ) {
-  await sendMail({
-    kind: "notification",
-    to: user.email,
-    subject: notification.title,
-    text: [
-      `Olá, ${user.name}.`,
-      "",
-      notification.title,
-      ...(notification.body ? [notification.body] : []),
-      "",
-      `Abrir no sistema: ${getAppUrl()}${notification.href}`,
-      "",
+  const { html, text } = renderEmail({
+    greeting: `Olá, ${user.name}.`,
+    heading: notification.title,
+    paragraphs: notification.body ? [notification.body] : [],
+    cta: { label: "Abrir no sistema", href: `${getAppUrl()}${notification.href}` },
+    footnote:
       "Você recebe este aviso por ter uma conta no Fila ATIC. Para deixar de receber e-mails, desative em Perfil > Notificações. Os avisos continuam aparecendo no sistema.",
-      "",
-      SIGNATURE,
-    ].join("\n"),
   });
+
+  await sendMail({ kind: "notification", to: user.email, subject: notification.title, text, html });
 }
 
 // Creates one notification per recipient and e-mails those who did not opt

@@ -3,6 +3,7 @@
 import type { MailLog } from "@prisma/client";
 
 import { getCurrentUser } from "@/lib/auth";
+import { renderEmail } from "@/lib/emailTemplate";
 import { sendMail } from "@/lib/mail";
 import { resolveTransportConfig } from "@/lib/mailTransport";
 import { prisma } from "@/lib/prisma";
@@ -71,18 +72,15 @@ export async function sendTestEmail(to: string): Promise<ActionResult<void>> {
   }
 
   try {
-    await sendMail({
-      kind: "test",
-      to: email,
-      subject: "E-mail de teste - Fila ATIC",
-      text: [
-        "Este e um e-mail de teste enviado pela tela Administracao > E-mail.",
-        "",
-        "Se voce recebeu esta mensagem, a conexao com o servidor de e-mail esta funcionando.",
-        "",
-        "Fila ATIC - Secretaria Municipal de Urbanismo e Licenciamento",
-      ].join("\n"),
+    const { html, text } = renderEmail({
+      heading: "E-mail de teste",
+      paragraphs: [
+        "Este é um e-mail de teste enviado pela tela Administração > E-mail.",
+        "Se você recebeu esta mensagem, a conexão com o servidor de e-mail está funcionando.",
+      ],
     });
+
+    await sendMail({ kind: "test", to: email, subject: "E-mail de teste - Fila ATIC", text, html });
   } catch (error) {
     return {
       success: false,

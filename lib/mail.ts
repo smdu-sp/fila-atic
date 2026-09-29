@@ -1,5 +1,6 @@
 import nodemailer, { type Transporter } from "nodemailer";
 
+import { EMAIL_LOGO_ATTACHMENT } from "@/lib/emailTemplate";
 import { prisma } from "@/lib/prisma";
 import {
   isRetryableMailError,
@@ -24,7 +25,12 @@ import {
 type Mail = {
   to: string;
   subject: string;
+  // Plain-text body; always required, sent as-is and used for the dev
+  // console fallback. `html` (build both with lib/emailTemplate.ts's
+  // renderEmail) makes the message multipart/alternative — most clients show
+  // it and fall back to `text` themselves when they can't render HTML.
   text: string;
+  html?: string;
   // What this message is, for Administração > E-mail's log. Callers that
   // don't pass one (there should be none left) show up as "other".
   kind?: string;
@@ -76,7 +82,7 @@ async function log(entry: {
   }
 }
 
-export async function sendMail({ to, subject, text, kind = "other" }: Mail) {
+export async function sendMail({ to, subject, text, html, kind = "other" }: Mail) {
   const client = transport();
 
   if (!client) {
@@ -96,7 +102,16 @@ export async function sendMail({ to, subject, text, kind = "other" }: Mail) {
 
   for (attempt = 1; attempt <= MAX_SEND_ATTEMPTS; attempt++) {
     try {
-      await client.sendMail({ from: config?.from, to, subject, text });
+      await client.sendMail({
+        from: config?.from,
+        to,
+        subject,
+        text,
+        html,
+        // the brand mark every renderEmail() html references as cid:...;
+        // harmless (and unused) on a plain-text send
+        attachments: html ? [EMAIL_LOGO_ATTACHMENT] : undefined,
+      });
       await log({ kind, to, subject, status: "sent", attempts: attempt });
       return;
     } catch (error) {

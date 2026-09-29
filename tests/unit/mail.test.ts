@@ -4,6 +4,8 @@
 // test database, like the rest of the integration tests.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { EMAIL_LOGO_ATTACHMENT } from "@/lib/emailTemplate";
+
 import { prisma, resetDb } from "../helpers";
 
 vi.unmock("@/lib/mail");
@@ -79,6 +81,20 @@ describe("sendMail with SMTP_HOST configured", () => {
     expect(sendMailMock).toHaveBeenCalledTimes(1);
     expect(sendMailMock).toHaveBeenCalledWith({ from: "Fila ATIC <fila@x.gov.br>", to: "a@x.gov.br", subject: "Oi", text: "corpo" });
     expect(await logsOf()).toMatchObject([{ status: "sent", kind: "notification", attempts: 1 }]);
+  });
+
+  it("attaches the embedded logo when an html body is given, and not for a plain-text one", async () => {
+    configure();
+    sendMailMock.mockResolvedValue({});
+    const { sendMail } = await freshMailModule();
+
+    await sendMail({ to: "a@x.gov.br", subject: "Oi", text: "corpo", html: "<p>corpo</p>" });
+    expect(sendMailMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ html: "<p>corpo</p>", attachments: [EMAIL_LOGO_ATTACHMENT] }),
+    );
+
+    await sendMail({ to: "a@x.gov.br", subject: "Oi", text: "corpo" });
+    expect(sendMailMock).toHaveBeenLastCalledWith(expect.objectContaining({ attachments: undefined }));
   });
 
   it("reuses one transport across several sends (connection pooling)", async () => {

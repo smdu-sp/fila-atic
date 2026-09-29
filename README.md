@@ -112,6 +112,12 @@ Configuração (`.env`, ver tabela acima):
 
 Confiabilidade: cada envio tenta de novo até 3 vezes com espera crescente quando a falha parece passageira (conexão recusada, tempo esgotado); uma rejeição do próprio relay (endereço inexistente, por exemplo) não é repetida, porque tentar de novo não muda o resultado. As conexões são reaproveitadas entre envios (`pool: true`), o que importa quando os avisos de prazo mandam várias mensagens na mesma execução.
 
+### Modelo visual dos e-mails
+
+Confirmação de solicitação, links de acompanhamento, avisos a solicitante e notificações à equipe usam o mesmo layout HTML (`lib/emailTemplate.ts`, função `renderEmail`): cabeçalho azul com o brasão da prefeitura e "Fila ATIC", título, texto, um botão de ação (com o link também por extenso logo abaixo, para quando o botão não funcionar) ou uma lista de links, e o rodapé com a assinatura. Todo e-mail é enviado como `multipart/alternative` (HTML + texto puro) — quem não abre HTML, ou tem o cliente configurado para não renderizar, recebe a versão em texto, que carrega a mesma informação. Qualquer valor vindo do banco (nome, título de projeto, mensagem) é escapado antes de entrar no HTML, então nada digitado por alguém vira código executável no e-mail de outra pessoa.
+
+O brasão é embutido no e-mail como anexo (`Content-ID`), não carregado do endereço do sistema — assim ele aparece mesmo para quem lê o e-mail fora da rede onde o Fila ATIC roda, e não depende do cliente de e-mail decidir carregar imagens externas. A imagem usada (`public/email-logo.png`, ~6 KB) é uma cópia reduzida de `public/smul_icone_branco.png`, gerada uma vez com `sharp` — para trocar o brasão, gere um novo `email-logo.png` do mesmo jeito (96×96, fundo transparente) em vez de apontar para o arquivo grande original.
+
 ## Tarefas e Kanban
 
 Clicar em uma tarefa abre o diálogo completo: título, descrição, status, prioridade, responsável, prazo, etiquetas coloridas (até 8, da paleta cadastrada pela coordenação), anexos e comentários. Só o responsável e a coordenação/DEV II alteram os dados; qualquer pessoa da equipe com acesso ao projeto comenta e anexa. Solicitantes nunca veem tarefas, comentários ou anexos de tarefa. O diálogo de "Nova tarefa" é idêntico ao de edição, inclusive anexos (até 3) e comentários: como a tarefa ainda não existe, eles ficam na tela e são enviados logo depois da criação. No topo do quadro de tarefas, um card mostra o progresso do projeto (percentual, barra e contagem de concluídas/em aberto/canceladas).

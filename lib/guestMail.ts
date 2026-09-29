@@ -1,8 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { sendMail } from "@/lib/mail";
+import { renderEmail } from "@/lib/emailTemplate";
 import { CONFIRM_TOKEN_TTL_MS, getAppUrl } from "@/lib/publicRequest";
-
-const SIGNATURE = "Fila ATIC - Secretaria Municipal de Urbanismo e Licenciamento";
 
 export function confirmationLink(token: string) {
   return `${getAppUrl()}/solicitar/confirmar/${token}`;
@@ -20,22 +19,17 @@ export async function sendConfirmationEmail(input: {
 }) {
   const hours = CONFIRM_TOKEN_TTL_MS / 60 / 60 / 1000;
 
-  await sendMail({
-    kind: "confirmation",
-    to: input.to,
-    subject: "Confirme sua solicitação - Fila ATIC",
-    text: [
-      `Olá, ${input.name}.`,
-      "",
+  const { html, text } = renderEmail({
+    greeting: `Olá, ${input.name}.`,
+    heading: "Confirme sua solicitação",
+    paragraphs: [
       `Recebemos a solicitação "${input.title}". Para registrá-la na fila, confirme seu e-mail pelo link abaixo (válido por ${hours} horas):`,
-      "",
-      confirmationLink(input.token),
-      "",
-      "Se você não fez essa solicitação, ignore esta mensagem. Nada será registrado.",
-      "",
-      SIGNATURE,
-    ].join("\n"),
+    ],
+    cta: { label: "Confirmar solicitação", href: confirmationLink(input.token) },
+    footnote: "Se você não fez essa solicitação, ignore esta mensagem. Nada será registrado.",
   });
+
+  await sendMail({ kind: "confirmation", to: input.to, subject: "Confirme sua solicitação - Fila ATIC", text, html });
 }
 
 export async function sendTrackingEmail(input: {
@@ -44,22 +38,17 @@ export async function sendTrackingEmail(input: {
   title: string;
   token: string;
 }) {
-  await sendMail({
-    kind: "tracking",
-    to: input.to,
-    subject: "Solicitação registrada - Fila ATIC",
-    text: [
-      `Olá, ${input.name}.`,
-      "",
+  const { html, text } = renderEmail({
+    greeting: `Olá, ${input.name}.`,
+    heading: "Solicitação registrada",
+    paragraphs: [
       `Sua solicitação "${input.title}" foi registrada na fila. Use o link abaixo para acompanhar o andamento e responder à equipe:`,
-      "",
-      trackingLink(input.token),
-      "",
-      "Guarde este e-mail: o link é pessoal e dá acesso à solicitação. Não o compartilhe.",
-      "",
-      SIGNATURE,
-    ].join("\n"),
+    ],
+    cta: { label: "Acompanhar solicitação", href: trackingLink(input.token) },
+    footnote: "Guarde este e-mail: o link é pessoal e dá acesso à solicitação. Não o compartilhe.",
   });
+
+  await sendMail({ kind: "tracking", to: input.to, subject: "Solicitação registrada - Fila ATIC", text, html });
 }
 
 // Every open (or recently closed) request of one e-mail address, in a single
@@ -69,25 +58,17 @@ export async function sendTrackingLinksEmail(input: {
   name: string;
   projects: Array<{ title: string; token: string }>;
 }) {
-  await sendMail({
-    kind: "tracking",
-    to: input.to,
-    subject: "Seus links de acompanhamento - Fila ATIC",
-    text: [
-      `Olá, ${input.name}.`,
-      "",
+  const { html, text } = renderEmail({
+    greeting: `Olá, ${input.name}.`,
+    heading: "Seus links de acompanhamento",
+    paragraphs: [
       "Você pediu os links das suas solicitações. Cada link é pessoal e dá acesso à solicitação; não o compartilhe.",
-      "",
-      ...input.projects.flatMap((project) => [
-        `• ${project.title}`,
-        `  ${trackingLink(project.token)}`,
-        "",
-      ]),
-      "Se você não fez este pedido, ignore esta mensagem.",
-      "",
-      SIGNATURE,
-    ].join("\n"),
+    ],
+    links: input.projects.map((project) => ({ label: project.title, href: trackingLink(project.token) })),
+    footnote: "Se você não fez este pedido, ignore esta mensagem.",
   });
+
+  await sendMail({ kind: "tracking", to: input.to, subject: "Seus links de acompanhamento - Fila ATIC", text, html });
 }
 
 // Tells a guest requester that something changed. Never throws: a mail
@@ -107,19 +88,19 @@ export async function notifyGuestRequester(projectId: string, change: string) {
 
     if (!project?.trackingToken || !project.requester.isGuest) return;
 
+    const { html, text } = renderEmail({
+      greeting: `Olá, ${project.requester.name}.`,
+      heading: `Atualização na solicitação "${project.title}"`,
+      paragraphs: [change],
+      cta: { label: "Acompanhar solicitação", href: trackingLink(project.trackingToken) },
+    });
+
     await sendMail({
       kind: "guest_update",
       to: project.requester.email,
       subject: `Atualização na solicitação "${project.title}" - Fila ATIC`,
-      text: [
-        `Olá, ${project.requester.name}.`,
-        "",
-        `${change} Acompanhe pelo link:`,
-        "",
-        trackingLink(project.trackingToken),
-        "",
-        SIGNATURE,
-      ].join("\n"),
+      text,
+      html,
     });
   } catch (error) {
     console.error("Falha ao notificar solicitante convidado", error);
