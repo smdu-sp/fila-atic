@@ -2,6 +2,12 @@
 
 Registro de decisões e entregas do projeto: o que foi pedido, o que foi feito e por quê. Não substitui o `git log` (que tem o detalhe técnico de cada commit) nem o `README.md` (que descreve o sistema como ele é hoje); serve para explicar o raciocínio por trás das mudanças, na ordem em que aconteceram. Entradas mais novas no topo.
 
+## 2026-09-30 (continuação, 2) — Mudança de etapa não aparecia no formulário
+
+O usuário reportou: mover um campo de etapa em Administração → Configurar formulário não refletia no formulário. Confirmei o defeito e a causa: `actions/requestFormActions.ts` nunca chamava `revalidatePath` — nenhuma das três mutações (criar, apagar, salvar configuração) avisava o Next de que `/solicitar`, `/`, `/projetos` e a própria tela de admin tinham dado que mudou. Sem isso, uma navegação comum dentro do sistema (clicar num link da barra lateral, não um F5) podia continuar mostrando a versão antiga por causa do cache de navegação do Next, do jeito que "salvei mas não mudou" normalmente aparenta. Todo outro lugar do sistema com uma configuração parecida (etiquetas, GitHub, rótulos de status) já tinha esse cuidado (`revalidatePath` depois de salvar) — só o formulário de solicitação tinha ficado de fora.
+
+Corrigido com um `refresh()` chamado nas três mutações, revalidando as quatro rotas. Reproduzi o defeito de propósito antes de consertar (mudei a etapa de um campo, sem recarregar a página, e o formulário continuava mostrando o campo na etapa antiga) e confirmei a correção do mesmo jeito depois — navegação normal pela barra lateral, sem F5, e o campo já aparece na etapa nova. Desfiz a mudança de teste (etapa do campo "Assunto"/título) depois de confirmar, para não alterar a configuração real do usuário.
+
 ## 2026-09-30 (continuação) — Formulário de solicitação em etapas (assistente)
 
 Pedido do usuário: transformar o formulário de solicitação — nos três lugares onde ele aparece (`/solicitar` sem conta, o modal de quem já tem conta, e por extensão qualquer lugar futuro que o reuse) — num assistente de 3 ou 4 etapas, com barra de progresso e animação simples, com a primeira etapa sendo só uma explicação pedindo o máximo de detalhe.

@@ -1,5 +1,7 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+
 import { isCoordination } from "@/lib/roles";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -14,6 +16,17 @@ import { loadRequestFields } from "@/lib/requestFormServer";
 type ActionResult<T> =
   | { success: true; data: T }
   | { success: false; error: string };
+
+// Every page that renders CreateProjectForm (it reads the fields once, as a
+// server-passed prop) plus the admin screen itself — without this, a saved
+// change only shows up after Next's client router cache for these routes
+// expires on its own, which felt like "it didn't save" even though it did.
+function refresh() {
+  revalidatePath("/solicitar");
+  revalidatePath("/");
+  revalidatePath("/projetos");
+  revalidatePath("/administracao/solicitacao");
+}
 
 const fieldSchema = z.object({
   id: z.string().optional(),
@@ -85,6 +98,8 @@ export async function createProjectRequestField(): Promise<
     },
   });
 
+  refresh();
+
   return {
     success: true,
     data: {
@@ -134,6 +149,8 @@ export async function deleteProjectRequestField(
   }
 
   await prisma.projectRequestField.delete({ where: { id: fieldId } });
+
+  refresh();
 
   return { success: true, data: undefined };
 }
@@ -221,6 +238,8 @@ export async function updateProjectRequestFields(
   });
 
   await prisma.$transaction(tasks);
+
+  refresh();
 
   return { success: true, data: undefined };
 }
