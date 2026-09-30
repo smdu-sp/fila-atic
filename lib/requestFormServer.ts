@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import {
   PROJECT_REQUEST_FIELDS,
+  type ConfigurableRequestStep,
   type ProjectRequestFieldConfig,
   type ProjectRequestFieldKey,
   type RequestFieldType,
@@ -36,6 +37,7 @@ export async function loadRequestFields(options?: {
       placeholder: true,
       helperText: true,
       order: true,
+      step: true,
       isSystem: true,
       fieldType: true,
       options: true,
@@ -52,6 +54,7 @@ export async function loadRequestFields(options?: {
     placeholder: row.placeholder,
     helperText: row.helperText,
     order: row.order,
+    step: (row.step === 4 ? 4 : 3) as ConfigurableRequestStep,
     isSystem: row.isSystem,
     fieldType: row.fieldType as RequestFieldType,
     options: row.options,

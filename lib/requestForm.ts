@@ -12,6 +12,16 @@ export type RequestFieldType =
   | "RADIO"
   | "DATE";
 
+// The request wizard has 4 steps: 1 (intro, no fields), 2 (the guest's own
+// name/e-mail/department — public form only, not configurable), 3 ("Dados da
+// solicitação") and 4 ("Detalhes"). Only 3 and 4 ever apply to a field.
+export type ConfigurableRequestStep = 3 | 4;
+
+export const REQUEST_FORM_STEPS: Array<{ value: ConfigurableRequestStep; label: string }> = [
+  { value: 3, label: "3 · Dados da solicitação" },
+  { value: 4, label: "4 · Detalhes" },
+];
+
 export type ProjectRequestFieldConfig = {
   id: string;
   key: ProjectRequestFieldKey | null;
@@ -19,6 +29,7 @@ export type ProjectRequestFieldConfig = {
   placeholder: string;
   helperText: string | null;
   order: number;
+  step: ConfigurableRequestStep;
   isSystem: boolean;
   fieldType: RequestFieldType;
   options: string | null;
@@ -34,6 +45,7 @@ export const PROJECT_REQUEST_FIELDS: ProjectRequestFieldConfig[] = [
     placeholder: "Titulo",
     helperText: null,
     order: 1,
+    step: 3,
     isSystem: true,
     fieldType: "TEXT",
     options: null,
@@ -47,6 +59,7 @@ export const PROJECT_REQUEST_FIELDS: ProjectRequestFieldConfig[] = [
     placeholder: "Descricao",
     helperText: null,
     order: 2,
+    step: 4,
     isSystem: true,
     fieldType: "LONG_TEXT",
     options: null,
@@ -60,6 +73,7 @@ export const PROJECT_REQUEST_FIELDS: ProjectRequestFieldConfig[] = [
     placeholder: "Justificativa",
     helperText: null,
     order: 3,
+    step: 4,
     isSystem: true,
     fieldType: "LONG_TEXT",
     options: null,
@@ -73,6 +87,7 @@ export const PROJECT_REQUEST_FIELDS: ProjectRequestFieldConfig[] = [
     placeholder: "Prioridade",
     helperText: null,
     order: 4,
+    step: 3,
     isSystem: true,
     fieldType: "TEXT",
     options: null,

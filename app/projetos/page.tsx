@@ -183,7 +183,7 @@ export default async function ProjetosPage({
                 <DialogTrigger asChild>
                   <Button>Abrir nova solicitação</Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent size="lg">
                   <DialogHeader>
                     <DialogTitle>Nova solicitação</DialogTitle>
                     <DialogDescription>

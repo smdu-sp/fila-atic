@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { ProjectRequestFieldConfig } from "@/lib/requestForm";
+import { REQUEST_FORM_STEPS, type ProjectRequestFieldConfig } from "@/lib/requestForm";
 
 type RequestFormSettingsProps = {
   fields: ProjectRequestFieldConfig[];
@@ -160,6 +160,26 @@ export function RequestFormSettings({ fields }: RequestFormSettingsProps) {
                   })
                 }
               />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor={`${field.id}-step`}>Etapa no formulário</Label>
+              <Select
+                value={String(field.step)}
+                onValueChange={(value) =>
+                  updateField(field.id, { step: Number(value) as 3 | 4 })
+                }
+              >
+                <SelectTrigger id={`${field.id}-step`}>
+                  <SelectValue placeholder="Etapa" />
+                </SelectTrigger>
+                <SelectContent>
+                  {REQUEST_FORM_STEPS.map((step) => (
+                    <SelectItem key={step.value} value={String(step.value)}>
+                      {step.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor={`${field.id}-type`}>Tipo</Label>

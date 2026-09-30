@@ -299,6 +299,10 @@ model ProjectRequestField {
   placeholder String
   helperText  String?                    @db.Text
   order       Int
+  // Which step of the request wizard shows this field: 3 ("Dados da
+  // solicitação") or 4 ("Detalhes"). Steps 1 (intro) and 2 (the guest's own
+  // name/e-mail/department) are fixed and never hold a configurable field.
+  step        Int                        @default(3)
   isSystem    Boolean                    @default(false)
   fieldType   RequestFieldType           @default(TEXT)
   options     String?                    @db.Text

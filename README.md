@@ -69,6 +69,18 @@ Sem o passo 5 não há quem cadastre os demais usuários. Se o e-mail já existi
 
 `ENVIRONMENT=local` só vale fora de builds de produção (`NODE_ENV !== "production"`); em produção o LDAP é sempre usado.
 
+## Abertura de solicitação
+
+O mesmo formulário (`app/projetos/_components/create-project-form.tsx`) abre um projeto em três lugares: `/solicitar` (sem conta), o modal "Abrir nova solicitação" (solicitante com conta, no dashboard e em `/projetos`) e é ele quem os dois chamam — não há três formulários para manter em dia. Ele é um **assistente de 3 ou 4 etapas**, com barra de progresso e uma animação leve de transição entre elas:
+
+1. **Antes de começar** — explica o que esperar e pede para detalhar bem o pedido; sem campos.
+2. **Suas informações** — só em `/solicitar`: nome, e-mail institucional (validado contra `PUBLIC_REQUEST_ALLOWED_DOMAINS`) e setor. Quem já tem conta pula direto para a próxima (o sistema já sabe quem é).
+3. **Dados da solicitação** e 4. **Detalhes** — os campos do sistema (título; descrição e justificativa) e os campos personalizados (Administração → Configurar formulário), cada um na etapa que a coordenação escolheu para ele.
+
+Avançar de etapa valida só os campos daquela etapa (react-hook-form `trigger` para os campos do sistema, checagem própria para os personalizados obrigatórios); o envio final revalida tudo de novo como garantia. Os valores preenchidos continuam guardados ao voltar uma etapa.
+
+Cada campo personalizado tem uma **etapa** (3 ou 4), configurada em Administração → Configurar formulário junto com rótulo, tipo e obrigatoriedade; o padrão para um campo novo é a etapa 3. A prioridade nunca aparece no formulário — é a coordenação quem define durante a triagem.
+
 ## Notificações
 
 Cada pessoa com conta recebe avisos no sino da barra lateral (e na página `/notificacoes`) e, se não desligar em **Perfil**, também por e-mail:
