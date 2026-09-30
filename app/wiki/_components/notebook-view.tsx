@@ -20,7 +20,7 @@ import {
   type NotebookTreeNode,
 } from "@/actions/notebookActions";
 import { CreatePageDialog } from "@/app/wiki/_components/create-page-dialog";
-import { NotebookTree } from "@/app/wiki/_components/notebook-tree";
+import { NotebookSidebar } from "@/app/wiki/_components/notebook-sidebar";
 import { BlockEditor } from "@/app/wiki/_components/block-editor";
 import { EmojiInput } from "@/components/emoji-picker";
 import { Button } from "@/components/ui/button";
@@ -61,7 +61,7 @@ export function NotebookView({
           <Plus />
           Nova página
         </Button>
-        <NotebookTree
+        <NotebookSidebar
           nodes={tree}
           currentPageId={page?.id ?? null}
           onAddChild={openCreate}

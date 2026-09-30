@@ -148,6 +148,8 @@ Todo campo de texto livre (chat do projeto, descrição e comentários de tarefa
 
 As páginas na barra lateral podem ser arrastadas: soltar perto do topo/fundo de outra página reordena como irmã dela (em qualquer pai); soltar sobre o meio da página torna a página arrastada uma subpágina dela.
 
+A caixa de busca no topo da barra lateral procura no **título e no conteúdo** de toda a wiki, sem diferenciar maiúsculas/minúsculas nem acentos ("servico" encontra "serviço"). Enquanto há texto na caixa, a lista de resultados substitui a árvore (cada um com o caminho de pastas quando não está na raiz, e um trecho do texto ao redor da palavra quando o título não é quem bateu); apagar a busca traz a árvore de volta.
+
 ## Anexos
 
 Os anexos das mensagens e das tarefas ficam em `storage/uploads/` (fora de `public/`, ignorado pelo git) e são servidos por `/uploads/[name]`, que exige sessão e acesso ao projeto; arquivos de tarefa são trabalho interno e nunca são entregues a solicitantes. Limites: 3 arquivos por envio, 10 MB cada, apenas tipos de documento e imagem (ver `lib/uploads.ts`). O limite de corpo da requisição (`next.config.ts`) precisa acompanhar esses números: o proxy do Next corta em 10 MB por padrão. Em produção, faça backup desse diretório junto com o banco.

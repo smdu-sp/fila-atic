@@ -14,6 +14,8 @@ import {
   serializeBlocks,
   type Block,
 } from "@/lib/wikiBlocks";
+import { searchNotebookPages as searchWikiPages } from "@/lib/wikiSearch";
+import type { NotebookSearchResult } from "@/lib/wikiSearch";
 
 // The internal wiki: a tree of Markdown pages, staff-only (never requesters
 // or guests). Anyone on staff may create, edit or delete any page — it is
@@ -549,23 +551,20 @@ export async function deleteNotebookPageAttachment(
   return { success: true, data: undefined };
 }
 
+// Title and body, accent-insensitive (see lib/wikiSearch.ts). Every page is
+// small and there are not many of them (an internal staff wiki), so fetching
+// all of them and matching in JS is simpler and more correct than trying to
+// search the stored JSON/Markdown with SQL — it also means a page written as
+// Markdown and one written as blocks are searched the exact same way.
 export async function searchNotebookPages(
   q: string,
-): Promise<ActionResult<Array<{ id: string; title: string }>>> {
+): Promise<ActionResult<NotebookSearchResult[]>> {
   const auth = await staffOrError();
   if (!auth.success) return auth;
 
-  const query = String(q ?? "")
-    .trim()
-    .slice(0, 100);
-  if (!query) return { success: true, data: [] };
-
   const pages = await prisma.notebookPage.findMany({
-    where: { title: { contains: query, mode: "insensitive" } },
-    select: { id: true, title: true },
-    orderBy: { title: "asc" },
-    take: 20,
+    select: { id: true, title: true, parentId: true, content: true },
   });
 
-  return { success: true, data: pages };
+  return { success: true, data: searchWikiPages(pages, String(q ?? "")) };
 }

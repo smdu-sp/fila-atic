@@ -337,13 +337,13 @@ describe("images", () => {
 });
 
 describe("search", () => {
-  it("finds pages by title, case-insensitively", async () => {
+  it("finds pages by title, case- and accent-insensitively", async () => {
     const dev = await makeUser(Role.DEV_GLOBAL);
     actAs(dev);
     await createNotebookPage({ title: "Servidor de Homologação" });
     await createNotebookPage({ title: "Template de e-mail" });
 
-    const result = await searchNotebookPages("homolog");
+    const result = await searchNotebookPages("HOMOLOGACAO");
     expect(result.success && result.data.map((p) => p.title)).toEqual([
       "Servidor de Homologação",
     ]);
@@ -352,5 +352,50 @@ describe("search", () => {
       success: true,
       data: [],
     });
+  });
+
+  it("also finds a match inside the body, with a snippet and the breadcrumb trail", async () => {
+    const dev = await makeUser(Role.DEV_GLOBAL);
+    actAs(dev);
+    const root = await createNotebookPage({ title: "Servidores" });
+    if (!root.success) throw new Error("create failed");
+    const child = await createNotebookPage({ title: "Impressoras", parentId: root.data });
+    if (!child.success) throw new Error("create failed");
+    await updateNotebookPage({
+      id: child.data,
+      blocks: [{ id: "b1", type: "paragraph", text: "Reinicie o serviço de fila de impressão pela manhã." }],
+    });
+
+    const result = await searchNotebookPages("Fila de Impressao");
+    expect(result.success && result.data).toMatchObject([
+      {
+        id: child.data,
+        title: "Impressoras",
+        titleMatch: false,
+        breadcrumbs: [
+          { id: root.data, title: "Servidores" },
+          { id: child.data, title: "Impressoras" },
+        ],
+      },
+    ]);
+    expect(result.success && result.data[0].snippet).toContain("fila de impressão");
+  });
+
+  it("puts title matches ahead of body-only matches", async () => {
+    const dev = await makeUser(Role.DEV_GLOBAL);
+    actAs(dev);
+    const withBodyMatch = await createNotebookPage({ title: "Outro assunto" });
+    if (!withBodyMatch.success) throw new Error("create failed");
+    await updateNotebookPage({
+      id: withBodyMatch.data,
+      blocks: [{ id: "b1", type: "paragraph", text: "menciona rede de passagem" }],
+    });
+    await createNotebookPage({ title: "Configuração de rede" });
+
+    const result = await searchNotebookPages("rede");
+    expect(result.success && result.data.map((p) => p.title)).toEqual([
+      "Configuração de rede",
+      "Outro assunto",
+    ]);
   });
 });
