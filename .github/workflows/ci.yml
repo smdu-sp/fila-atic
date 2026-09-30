@@ -50,6 +50,12 @@ jobs:
 
       - run: npx prisma generate
 
+      # next-env.d.ts is gitignored (regenerated locally by `next dev`/`next
+      # build`) and it's what declares the *.png/*.jpg/... module types used
+      # by @/public/* imports — without it, a fresh checkout fails type-check
+      # on every such import even though nothing is actually wrong.
+      - run: npx next typegen
+
       - name: Lint
         run: npm run lint
 
