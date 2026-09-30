@@ -3,13 +3,7 @@ import { PageHeader } from "@/components/page-header";
 import { listUsers } from "@/actions/userActions";
 import { requireRole } from "@/lib/auth";
 import { AppSidebar } from "@/components/app-sidebar";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   SidebarInset,
   SidebarProvider,

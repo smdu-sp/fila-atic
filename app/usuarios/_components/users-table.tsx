@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Role } from "@prisma/client";
-import { Plus, Pencil, RotateCw, Search, Trash2 } from "lucide-react";
+import { Plus, Pencil, RotateCw, Search } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,7 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { UserRoleForm } from "@/app/usuarios/_components/user-role-form";
-import { UserStatusForm } from "@/app/usuarios/_components/user-status-form";
+import { UserStatusToggle } from "@/app/usuarios/_components/user-status-toggle";
 import { CreateUserForm } from "@/app/usuarios/_components/create-user-form";
 import { roleLabels } from "@/lib/roles";
 
@@ -217,7 +217,7 @@ export function UsersTable({ users }: UsersTableProps) {
                           <DialogHeader>
                             <DialogTitle>Editar usuario</DialogTitle>
                             <DialogDescription>
-                              Atualize permissao e status de acesso.
+                              Atualize a permissao de acesso.
                             </DialogDescription>
                           </DialogHeader>
                           <div className="grid gap-4">
@@ -225,16 +225,14 @@ export function UsersTable({ users }: UsersTableProps) {
                               userId={user.id}
                               defaultRole={user.role}
                             />
-                            <UserStatusForm
-                              userId={user.id}
-                              defaultStatus={user.isActive}
-                            />
                           </div>
                         </DialogContent>
                       </Dialog>
-                      <Button variant="ghost" size="icon-sm" disabled>
-                        <Trash2 className="text-destructive" />
-                      </Button>
+                      <UserStatusToggle
+                        userId={user.id}
+                        name={user.name}
+                        isActive={user.isActive}
+                      />
                     </div>
                   </td>
                 </tr>

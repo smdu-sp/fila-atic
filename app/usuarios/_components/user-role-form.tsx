@@ -1,6 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -32,6 +33,7 @@ type UserRoleFormProps = {
 };
 
 export function UserRoleForm({ userId, defaultRole }: UserRoleFormProps) {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const { control, handleSubmit } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -46,6 +48,7 @@ export function UserRoleForm({ userId, defaultRole }: UserRoleFormProps) {
         return;
       }
       toast.success("Role atualizada.");
+      router.refresh();
     });
   });
 

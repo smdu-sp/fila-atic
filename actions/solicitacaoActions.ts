@@ -1,5 +1,7 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+
 import { ASSIGNABLE_ROLES, isManagerRole } from "@/lib/roles";
 import {
   ProjectCategory,
@@ -324,6 +326,9 @@ export async function createProjectMessage(
         : data,
   });
 
+  revalidatePath(`/solicitacoes/${projectId}`);
+  revalidatePath("/logs");
+
   await notifyGuestRequester(
     projectId,
     "Ha uma nova mensagem da equipe na sua solicitacao.",
@@ -439,6 +444,12 @@ export async function updateProjectStatusRestricted(
       },
     });
   });
+
+  revalidatePath(`/solicitacoes/${projectId}`);
+  revalidatePath("/fila");
+  revalidatePath("/projetos");
+  revalidatePath("/kanban");
+  revalidatePath("/logs");
 
   if (status !== current.status) {
     await notifyGuestRequester(
